@@ -1,0 +1,42 @@
+/* Native window is the retro case itself; browser preview retains its backdrop. */
+.desktop-workspace.desktop-workspace {
+ padding: 0;
+ background: #202635;
+ height: 100dvh;
+ min-height: 0;
+ overflow: hidden;
+}
+.desktop-workspace .app-shell {
+ max-width: none;
+ width: 100%;
+ height: 100%;
+ margin: 0;
+ display: flex;
+ flex-direction: column;
+ box-shadow: inset 1px 1px #555f72, inset -1px -1px #202a3a;
+}
+.desktop-workspace .app-inner {flex: 1; min-height: 0; overflow: auto;}
+.desktop-workspace .titlebar {
+ --wails-draggable: drag;
+ flex: none;
+ min-height: 36px;
+ padding: 2px 3px 7px;
+ user-select: none;
+}
+.desktop-workspace .statusbar {flex: none;}
+.window-controls {
+ --wails-draggable: no-drag;
+ display: flex;
+ flex: none;
+ gap: 4px;
+}
+.window-controls button {
+ --wails-draggable: no-drag;
+ min-height: 26px;
+ width: 29px;
+ padding: 0;
+ font: 700 16px/1 monospace;
+ letter-spacing: 0;
+}
+.window-controls .window-close {background: linear-gradient(#c2ac99,#987568); color: #2e1f1b;}
+.window-controls .window-close:hover {background: #ca826e;}

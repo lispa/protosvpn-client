@@ -1,0 +1,6 @@
+/* Headless test utility: capture the actual X11 desktop as PPM. */
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <stdio.h>
+static unsigned char component(unsigned long p,unsigned long mask){if(!mask)return 0;int s=0;while(!(mask&1)){mask>>=1;s++;}return (unsigned char)(((p>>s)&mask)*255/mask);}
+int main(int argc,char**argv){if(argc!=2)return 2;Display*d=XOpenDisplay(NULL);if(!d)return 3;Window root=DefaultRootWindow(d),rr,pr,*children=NULL;unsigned int n=0;int visible=0;if(XQueryTree(d,root,&rr,&pr,&children,&n)){for(unsigned int i=0;i<n;i++){XWindowAttributes a;if(XGetWindowAttributes(d,children[i],&a)&&a.map_state==IsViewable&&a.width>=640&&a.height>=600)visible=1;}if(children)XFree(children);}if(!visible){XCloseDisplay(d);return 4;}XWindowAttributes a;XGetWindowAttributes(d,root,&a);XImage*im=XGetImage(d,root,0,0,a.width,a.height,AllPlanes,ZPixmap);if(!im)return 5;FILE*f=fopen(argv[1],"wb");if(!f)return 6;fprintf(f,"P6\n%d %d\n255\n",a.width,a.height);for(int y=0;y<a.height;y++)for(int x=0;x<a.width;x++){unsigned long p=XGetPixel(im,x,y);unsigned char c[3]={component(p,im->red_mask),component(p,im->green_mask),component(p,im->blue_mask)};fwrite(c,1,3,f);}fclose(f);XDestroyImage(im);XCloseDisplay(d);return 0;}
