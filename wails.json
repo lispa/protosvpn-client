@@ -8,5 +8,5 @@
  "frontend:dev:watcher":"npm run dev",
  "frontend:dev:serverUrl":"auto",
  "author":{"name":"ProtosVPN"},
- "info":{"productName":"ProtosVPN","productVersion":"0.1.2","comments":"Development preview: profiles in memory, VPN engines not integrated."}
+ "info":{"productName":"ProtosVPN","productVersion":"0.1.3","comments":"Development preview: profiles in memory, VPN engines not integrated."}
 }

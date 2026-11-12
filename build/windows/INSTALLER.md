@@ -1,11 +1,13 @@
-# Windows installer — 0.1.2-preview
+# Windows installer — 0.1.3-preview
 
-Run `ProtosVPN-0.1.2-preview-windows-amd64-setup.exe` as your normal Windows user. Close an already running ProtosVPN before installation or updates.
+Both Start menu and Desktop shortcuts are now required and recreated on installation/update, including silent installs. The Start menu entry is directly named ProtosVPN. Both shortcuts use the application executable icon. Known legacy submenu shortcuts are cleaned up; uninstallation removes both shortcuts. Static regression tests: `python3 build/test_installer.py -v`.
+
+Run `ProtosVPN-0.1.3-preview-windows-amd64-setup.exe` as your normal Windows user. Close an already running ProtosVPN before installation or updates.
 
 - NSIS Unicode wizard, English/Russian language selection.
-- Installs the existing verified 0.1.2-preview Windows x64 GUI executable. Application functionality is unchanged.
+- Installs the existing verified 0.1.3-preview Windows x64 GUI executable. Application functionality is unchanged.
 - Per-user install, default `%LOCALAPPDATA%\Programs\ProtosVPN`; `RequestExecutionLevel user`, no administrative privileges requested.
-- Creates Start menu shortcuts, offers an optional Desktop shortcut.
+- Creates both Start menu and Desktop shortcuts automatically.
 - Registers the uninstaller under HKCU so removal is available from Windows Apps settings.
 - Checks per-machine and per-user Evergreen WebView2 registration before first launch. If missing, offers the official Microsoft download page, without downloading or executing third-party dependencies. Install Evergreen Runtime there, then launch from Start.
 - Uninstall deletes only named application files and shortcuts; no recursive directory deletion and no WebView preference wipe. A running/locked executable blocks removal instead of forcing process termination.

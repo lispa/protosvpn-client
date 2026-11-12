@@ -4,7 +4,7 @@ Unicode true
 !include "x64.nsh"
 
 !define APP "ProtosVPN"
-!define VERSION "0.1.2"
+!define VERSION "0.1.3"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProtosVPN"
 !define WEBVIEW_KEY "Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
 Name "${APP} ${VERSION}-preview"
@@ -28,7 +28,7 @@ VIAddVersionKey /LANG=1033 "LegalCopyright" "ProtosVPN"
 !define MUI_FINISHPAGE_RUN_FUNCTION LaunchApp
 !define MUI_FINISHPAGE_RUN_TEXT "$(LaunchText)"
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_COMPONENTS
+
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
@@ -40,10 +40,10 @@ VIAddVersionKey /LANG=1033 "LegalCopyright" "ProtosVPN"
 
 LangString WelcomeText ${LANG_ENGLISH} "This wizard installs ProtosVPN for the current Windows user. Administrator rights are not required.$\r$\n$\r$\nDevelopment preview: VPN connections are not available yet. Profiles are kept only in memory and disappear when the application exits.$\r$\n$\r$\nClose ProtosVPN before installing or updating."
 LangString WelcomeText ${LANG_RUSSIAN} "Мастер установит ProtosVPN для текущего пользователя Windows. Права администратора не требуются.$\r$\n$\r$\nПредварительная версия: VPN-подключение пока недоступно. Профили хранятся только в памяти и исчезают после закрытия.$\r$\n$\r$\nПеред установкой или обновлением закройте ProtosVPN."
-LangString AppSection ${LANG_ENGLISH} "Application and Start menu shortcut (required)"
-LangString AppSection ${LANG_RUSSIAN} "Приложение и ярлык в меню «Пуск» (обязательно)"
-LangString DesktopSection ${LANG_ENGLISH} "Desktop shortcut"
-LangString DesktopSection ${LANG_RUSSIAN} "Ярлык на рабочем столе"
+LangString AppSection ${LANG_ENGLISH} "Application, Start menu and Desktop shortcuts"
+LangString AppSection ${LANG_RUSSIAN} "Приложение и ярлыки в меню «Пуск» и на рабочем столе"
+LangString ShortcutFailed ${LANG_ENGLISH} "Could not create the application shortcuts. Check permissions for your Desktop and Start menu, then run this installer again."
+LangString ShortcutFailed ${LANG_RUSSIAN} "Не удалось создать ярлыки приложения. Проверьте доступ к рабочему столу и меню «Пуск», затем повторите установку."
 LangString LaunchText ${LANG_ENGLISH} "Launch ProtosVPN"
 LangString LaunchText ${LANG_RUSSIAN} "Запустить ProtosVPN"
 LangString NeedX64 ${LANG_ENGLISH} "This installer requires 64-bit Windows."
@@ -92,9 +92,19 @@ Section "$(AppSection)" SEC_APP
  File /oname=README.ru.md "../../README.md"
  File /oname=VERIFICATION.md "../../VERIFICATION.md"
  WriteUninstaller "$INSTDIR\Uninstall.exe"
- CreateDirectory "$SMPROGRAMS\ProtosVPN"
- CreateShortcut "$SMPROGRAMS\ProtosVPN\ProtosVPN.lnk" "$INSTDIR\ProtosVPN.exe"
- CreateShortcut "$SMPROGRAMS\ProtosVPN\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
+ ; Both shortcuts are required, including during upgrades and silent installs.
+ ; Shell constants honour redirected/OneDrive user Desktop folders.
+ ClearErrors
+ CreateShortcut "$SMPROGRAMS\ProtosVPN.lnk" "$INSTDIR\ProtosVPN.exe" "" "$INSTDIR\ProtosVPN.exe" 0
+ CreateShortcut "$DESKTOP\ProtosVPN.lnk" "$INSTDIR\ProtosVPN.exe" "" "$INSTDIR\ProtosVPN.exe" 0
+ ${If} ${Errors}
+  MessageBox MB_ICONSTOP "$(ShortcutFailed)"
+  Abort
+ ${EndIf}
+ ; Remove only the known legacy Start menu shortcuts from older installers.
+ Delete "$SMPROGRAMS\ProtosVPN\ProtosVPN.lnk"
+ Delete "$SMPROGRAMS\ProtosVPN\Uninstall.lnk"
+ RMDir "$SMPROGRAMS\ProtosVPN"
  WriteRegStr HKCU "Software\ProtosVPN" "InstallDir" "$INSTDIR"
  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayName" "ProtosVPN (development preview)"
  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayVersion" "${VERSION}-preview"
@@ -106,10 +116,6 @@ Section "$(AppSection)" SEC_APP
  WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
 SectionEnd
 
-Section /o "$(DesktopSection)" SEC_DESKTOP
- SetShellVarContext current
- CreateShortcut "$DESKTOP\ProtosVPN.lnk" "$INSTDIR\ProtosVPN.exe"
-SectionEnd
 
 Function LaunchApp
  Call CheckWebView
@@ -139,6 +145,7 @@ Section "Uninstall"
   Abort
  ${EndIf}
  Delete "$DESKTOP\ProtosVPN.lnk"
+ Delete "$SMPROGRAMS\ProtosVPN.lnk"
  Delete "$SMPROGRAMS\ProtosVPN\ProtosVPN.lnk"
  Delete "$SMPROGRAMS\ProtosVPN\Uninstall.lnk"
  RMDir "$SMPROGRAMS\ProtosVPN"

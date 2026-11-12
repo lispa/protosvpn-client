@@ -6,4 +6,4 @@ mkdir -p release
 sudo -n docker build -f build/installer.Dockerfile -t protosvpn-installer:ubuntu24 .
 sudo -n docker run --rm --network none --user "$(id -u):$(id -g)" \
  -v "$PWD:/src" protosvpn-installer:ubuntu24 -V3 installer.nsi
-sha256sum release/ProtosVPN-0.1.2-preview-windows-amd64-setup.exe > release/ProtosVPN-0.1.2-preview-setup.sha256
+sha256sum release/ProtosVPN-0.1.3-preview-windows-amd64-setup.exe > release/ProtosVPN-0.1.3-preview-setup.sha256

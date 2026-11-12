@@ -35,7 +35,7 @@ func (s *Service) State() State {
 	for _, e := range s.entries {
 		profiles = append(profiles, cloneProfile(e.profile))
 	}
-	return State{SystemLocale: systemLocale(), Version: "0.1.2", Profiles: profiles, SelectedID: s.selected, StorageMode: "memory", CSRFToken: s.token, Connection: Connection{Status: "disconnected"}}
+	return State{SystemLocale: systemLocale(), Version: "0.1.3", Profiles: profiles, SelectedID: s.selected, StorageMode: "memory", CSRFToken: s.token, Connection: Connection{Status: "disconnected"}}
 }
 func (s *Service) Select(id string) error {
 	s.mu.Lock()
@@ -84,5 +84,5 @@ func (s *Service) Delete(id string) error {
 func (s *Service) Diagnostics() Diagnostics {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return Diagnostics{Version: "0.1.2", OS: runtime.GOOS, Arch: runtime.GOARCH, StorageMode: "memory", ProfileCount: len(s.entries)}
+	return Diagnostics{Version: "0.1.3", OS: runtime.GOOS, Arch: runtime.GOARCH, StorageMode: "memory", ProfileCount: len(s.entries)}
 }

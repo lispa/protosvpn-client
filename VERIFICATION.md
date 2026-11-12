@@ -1,4 +1,14 @@
-# Verification of development preview 0.1.2
+# Verification of development preview 0.1.3
+
+## Installer shortcut update
+
+- Both Start menu and Desktop shortcuts are mandatory, with application icons and current-user shell folders. Older submenu shortcuts are cleaned up on update; uninstall removes both current and legacy shortcut paths.
+- Three static NSIS regression checks passed: required shortcuts/error handling, per-user/uninstall policy, and version agreement.
+- Go race tests and go vet, 18 frontend tests and production frontend build re-executed: PASS.
+- Windows x64 and Linux desktop executables rebuilt; Linux desktop configuration tests: PASS.
+- Real Windows install/update/uninstall and actual shortcut appearance are not tested on this Linux host. Packaging and static checks do not replace a Windows installation test.
+
+## Previous verification (0.1.2)
 
 ## Frameless window update: re-executed checks
 
