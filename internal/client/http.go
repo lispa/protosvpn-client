@@ -40,7 +40,7 @@ func serviceError(w http.ResponseWriter, e error) {
 		case "UNSUPPORTED_PROFILE":
 			sendError(w, 400, code, "This VLESS configuration is not supported.")
 			return
-		case "CONNECT_FAILED", "PROXY_FAILED", "RESTORE_FAILED", "BUSY", "ENGINE_START_FAILED", "EGRESS_CHECK_FAILED", "HELPER_START_FAILED", "HELPER_EXITED", "HELPER_TIMEOUT":
+		case "CONNECT_FAILED", "PROXY_FAILED", "RESTORE_FAILED", "BUSY", "ENGINE_START_FAILED", "EGRESS_CHECK_FAILED", "HELPER_START_FAILED", "HELPER_EXITED", "HELPER_TIMEOUT", "COMPATIBILITY_UNAVAILABLE", "UNSUPPORTED_COMPATIBILITY":
 		default:
 			code = "CONNECT_FAILED"
 		}
@@ -67,13 +67,16 @@ func decodeBody(w http.ResponseWriter, r *http.Request, out any, emptyOK bool) b
 	}
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
-	if !strictStringObject(raw) || d.Decode(out) != nil || d.Decode(new(any)) != io.EOF {
+	if !strictObject(raw, r.URL.Path == "/api/connect") || d.Decode(out) != nil || d.Decode(new(any)) != io.EOF {
 		sendError(w, 400, "INVALID_INPUT", "Invalid JSON request body.")
 		return false
 	}
 	return true
 }
 func strictStringObject(raw []byte) bool {
+	return strictObject(raw, false)
+}
+func strictObject(raw []byte, allowCompatibility bool) bool {
 	d := json.NewDecoder(bytes.NewReader(raw))
 	first, err := d.Token()
 	if err != nil || first != json.Delim('{') {
@@ -95,7 +98,9 @@ func strictStringObject(raw []byte) bool {
 			return false
 		}
 		if len(value) == 0 || value[0] != '"' {
-			return false
+			if !allowCompatibility || key != "compatibility" || (!bytes.Equal(value, []byte("true")) && !bytes.Equal(value, []byte("false"))) {
+				return false
+			}
 		}
 	}
 	last, err := d.Token()
@@ -160,7 +165,8 @@ func NewHandler(s *Service) http.Handler {
 			sendJSON(w, 201, map[string]any{"profile": p})
 		case "/api/select", "/api/connect":
 			var input struct {
-				ID string `json:"id"`
+				ID            string `json:"id"`
+				Compatibility bool   `json:"compatibility"`
 			}
 			if !decodeBody(w, r, &input, false) {
 				return
@@ -174,7 +180,7 @@ func NewHandler(s *Service) http.Handler {
 					serviceError(w, ErrNotFound)
 					return
 				}
-				if err := s.Connect(r.Context(), input.ID); err != nil {
+				if err := s.ConnectWithCompatibility(r.Context(), input.ID, input.Compatibility); err != nil {
 					serviceError(w, err)
 					return
 				}

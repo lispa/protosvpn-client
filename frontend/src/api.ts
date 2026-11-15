@@ -1,7 +1,9 @@
 export interface Profile { id:string; name:string; protocol:'vless'|'openvpn'; host:string; port:number; transport:string; security:string; requiresAuth:boolean; warnings:string[] }
-export interface State { systemLocale?:string; version:string; profiles:Profile[]; selectedId:string; storageMode:'memory'; csrfToken:string; connection:{status:'disconnected'|'connecting'|'connected'|'disconnecting'|'error'; profileId:string; engineAvailable:boolean; mode:'system-proxy'; errorCode?:string} }
+export interface State { systemLocale?:string; version:string; profiles:Profile[]; selectedId:string; storageMode:'memory'; csrfToken:string; connection:{status:'disconnected'|'connecting'|'connected'|'disconnecting'|'error'; profileId:string; engineAvailable:boolean; mode:'system-proxy'; errorCode?:string; compatibility?:boolean} }
 export interface Diagnostics {version:string;os:string;arch:string;storageMode:'memory';engineAvailable:boolean;profileCount:number}
 export const apiErrorMessages = {
+  COMPATIBILITY_UNAVAILABLE: 'Старое ядро совместимости недоступно. Проверьте установку приложения или используйте современный профиль с TLS/Reality.',
+  UNSUPPORTED_COMPATIBILITY: 'Совместимость доступна только для VLESS без TLS/Reality (security=none). Для этого профиля используйте обычное подключение.',
   ENGINE_START_FAILED: '[ENGINE_START_FAILED] Xray не запустился или локальный прокси не готов. Сбой до проверки сервера.',
   EGRESS_CHECK_FAILED: '[EGRESS_CHECK_FAILED] Xray запущен, но HTTPS-проверка через сервер не прошла. Прокси Windows ещё не включён.',
   HELPER_START_FAILED: '[HELPER_START_FAILED] Windows не удалось запустить процесс-помощник.',

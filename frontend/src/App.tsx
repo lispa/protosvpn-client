@@ -6,10 +6,11 @@ import { ImportDialog } from './ImportDialog';
 import { ProfileDialog } from './ProfileDialog';
 import { readScale, SettingsDialog } from './SettingsDialog';
 import { DiagnosticsDialog } from './DiagnosticsDialog';
+import { LegacyDialog, legacyRisks } from './LegacyDialog';
 import styles from './App.module.css';
 import './desktop.css';
 
-type Dialog = 'import' | 'rename' | 'delete' | 'settings' | 'diagnostics' | null;
+type Dialog = 'import' | 'rename' | 'delete' | 'settings' | 'diagnostics' | 'legacy' | null;
 export default function App(){return <I18nProvider><ClientApp/></I18nProvider>;}
 function ClientApp() {
  const {t,setSystemLocale}=useI18n();
@@ -17,6 +18,7 @@ function ClientApp() {
   const [error, setError] = useState('');
   const [modal, setModal] = useState<Dialog>(null);
   const [busy, setBusy] = useState(false);
+  const [compatibility, setCompatibility] = useState(false);
   const [scale, setScale] = useState(readScale);
   const [operation, setOperation] = useState<'connecting'|'disconnecting'|null>(null);
   const operationRef = useRef(false);
@@ -24,6 +26,8 @@ function ClientApp() {
   const mounted = useRef(true);
   const controller = useRef<AbortController | null>(null);
   const selected = state?.profiles.find(profile => profile.id === state.selectedId);
+  const legacyEligible = selected?.protocol === 'vless' && (!selected.security || selected.security === 'none');
+  useEffect(()=>{setCompatibility(false);setModal(current=>current==='legacy'?null:current);},[state?.selectedId]);
   const connection = state?.connection;
   const connected = connection?.status === 'connected';
   const canDisconnect = connected || (connection?.status === 'error' && connection.errorCode === 'RESTORE_FAILED');
@@ -55,8 +59,9 @@ function ClientApp() {
     void poll();
     return ()=>{active=false;mounted.current=false;clearTimeout(timer);controller.current?.abort();};
   }, []);
-  async function changeConnection() {
+  async function changeConnection(confirmedCompatibility=false) {
     if(operationRef.current) return;
+    if(!canDisconnect && compatibility && legacyEligible && !confirmedCompatibility) {setModal('legacy');return;}
     operationRef.current=true;
     const disconnect=canDisconnect;
     setOperation(disconnect?'disconnecting':'connecting');setError('');
@@ -66,7 +71,7 @@ function ClientApp() {
       await request(disconnect?'/disconnect':'/connect',{
         method:'POST',signal:abort.signal,
         headers:{'Content-Type':'application/json','X-ProtosVPN-Token':state?.csrfToken || ''},
-        body:JSON.stringify(disconnect?{}:{id:selected?.id}),
+        body:JSON.stringify(disconnect?{}:{id:selected?.id,...(confirmedCompatibility && legacyEligible ? {compatibility:true} : {})}),
       });
     } catch (cause) {
       if(mounted.current)setError(cause instanceof ApiError ? cause.message : abort.signal.aborted ? 'Операция не завершилась за 35 секунд. Проверяем фактическое состояние.' : apiErrorMessages.CONNECT_FAILED);
@@ -100,6 +105,7 @@ function ClientApp() {
         <WindowControls/>
       </header>
       <div className="app-inner">
+        {connected && connection?.compatibility && <aside className="error-banner" role="alert"><strong>{t('Активно небезопасное подключение')}</strong><p>{t(legacyRisks)}</p></aside>}
         {error && <div className="error-banner" role="alert"><span>{t(error)}</span><button onClick={() => { setError(''); void refresh().catch(() => setError(t("Локальная служба недоступна."))); }}>{t("Повторить")}</button></div>}
         <section className="display" aria-labelledby="connection-heading">
           <div className="display-top"><h2 id="connection-heading">{t("Выбранный профиль")}</h2><span className="connection-badge" role="status" aria-live="polite"><i aria-hidden="true"/>{t(statusLabel)}</span></div>
@@ -116,6 +122,7 @@ function ClientApp() {
         </section>
         <div className="connection-actions"><button className="connect" disabled={connectionBusy || (!canDisconnect && (busy || !connection?.engineAvailable || selected?.protocol !== 'vless'))} aria-busy={connectionBusy} aria-describedby="engine" onClick={()=>void changeConnection()}>{connectionBusy ? <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray="40 20"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle></svg> : <span aria-hidden="true">⏻</span>} {t(connectionBusy ? phase==='disconnecting'?'Отключение…':'Подключение…' : canDisconnect?'Отключить':'Подключить')}</button><span className="no-tunnel">{t("Режим: системный прокси · не VPN-туннель")}</span><button onClick={() => setModal('settings')}>{t("Настройки")}</button></div>
         <p id="engine" className="engine-note">{t(connection?.engineAvailable ? "Системный прокси для VLESS. OpenVPN пока недоступен." : "VPN-ядро и системный помощник не установлены. Подключение пока недоступно.")}</p>
+        {legacyEligible && <label className="profile-note"><input type="checkbox" checked={compatibility} onChange={event=>setCompatibility(event.target.checked)} disabled={busy || connectionBusy || connected}/>{t('Совместимость со старым Xray (небезопасно)')}</label>}
         {connection?.status==='error' && connection.errorCode && !error && <p className="error-banner" role="alert">{t(apiErrorMessages[safeErrorCode(connection.errorCode)])}</p>}
         <section className="profile-section" aria-labelledby="profiles-heading">
           <div className="section-title"><h2 id="profiles-heading">{t("Подключения")}</h2><span className="section-rule"/><span className="profile-count">{t("Профилей:")+" "}{state ? state.profiles.length : '—'}</span></div>
@@ -134,6 +141,7 @@ function ClientApp() {
     {modal === 'import' && <ImportDialog onClose={close} onImport={data => mutate('/import', 'POST', data)}/>}
     {modal === 'settings' && <SettingsDialog scale={scale} onClose={close} onSave={value => { setScale(value); try { localStorage.setItem('protosvpn.uiScale', value); } catch { /* Preference remains session-only when storage is unavailable. */ } }}/>}
     {modal === 'diagnostics' && <DiagnosticsDialog onClose={close}/>}
+    {modal === 'legacy' && <LegacyDialog onClose={close} onContinue={()=>{close();void changeConnection(true);}}/>}
     {(modal === 'rename' || modal === 'delete') && selected && <ProfileDialog kind={modal} profile={selected} onClose={close} onSave={name => mutate(`/profiles/${encodeURIComponent(selected.id)}`, modal === 'rename' ? 'PATCH' : 'DELETE', modal === 'rename' ? { name } : undefined)}/>}
   </div>;
 }

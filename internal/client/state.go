@@ -6,6 +6,7 @@ import (
 )
 
 type Connection struct {
+	Compatibility   bool   `json:"compatibility"`
 	Mode            string `json:"mode"`
 	ErrorCode       string `json:"errorCode,omitempty"`
 	Status          string `json:"status"`
@@ -38,7 +39,7 @@ func (s *Service) State() State {
 	for _, e := range s.entries {
 		profiles = append(profiles, cloneProfile(e.profile))
 	}
-	return State{SystemLocale: systemLocale(), Version: "0.2.1", Profiles: profiles, SelectedID: s.selected, StorageMode: "memory", CSRFToken: s.token, Connection: connection}
+	return State{SystemLocale: systemLocale(), Version: "0.2.2", Profiles: profiles, SelectedID: s.selected, StorageMode: "memory", CSRFToken: s.token, Connection: connection}
 }
 func (s *Service) Select(id string) error {
 	s.mu.Lock()
@@ -94,5 +95,5 @@ func (s *Service) Diagnostics() Diagnostics {
 	available := s.connectionState().EngineAvailable
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return Diagnostics{Version: "0.2.1", OS: runtime.GOOS, Arch: runtime.GOARCH, StorageMode: "memory", EngineAvailable: available, ProfileCount: len(s.entries)}
+	return Diagnostics{Version: "0.2.2", OS: runtime.GOOS, Arch: runtime.GOARCH, StorageMode: "memory", EngineAvailable: available, ProfileCount: len(s.entries)}
 }

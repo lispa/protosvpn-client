@@ -1,103 +1,32 @@
-# Verification of development preview 0.2.1
+# Verification — ProtosVPN 0.2.2-preview
 
-## Diagnostic build — connection failure remains under investigation
+## Reproduced incompatibility
 
-The user reports the same VLESS link works in XraySurf while ProtosVPN fails, with XraySurf fully closed during ProtosVPN testing. There is no current reproduction of that specific Windows failure on this Linux host.
+The user ran the bundled Windows Xray v26.11.9 successfully, validated minimal stdin JSON (`Configuration OK`), and started a loopback HTTP inbound. Their curl probe returned HTTP 400 with `Proxy-Connection: close`, matching our readiness test. This establishes the manual executable/stdin/inbound path, not the app-generated VLESS config or an external connection.
 
-Confirmed defect: the frontend read flat `code`/`errorCode`, but the real Go API returns `error.code`. Regression tests failed with `REQUEST_FAILED` instead of the actual codes; the minimal parser fix passed. New stage codes distinguish helper startup/exit/timeout, core startup and HTTPS egress-check failures from WinINet proxy failures. Unknown messages and raw backend text remain hidden.
+On this Linux host, the actual modern Xray rejected a synthetic VLESS `security=none` / `encryption=none` outbound to a non-private destination during configuration loading:
 
-The gstatic HTTPS check, timeouts, core configuration and system proxy policy are unchanged. This release is **not a claimed fix for the actual connection failure**. A Windows test/screenshot of the new diagnostic message is required to identify the failing boundary. No Windows environment or user credentials were available for direct reproduction.
+> vless without TLS or other encryption is prohibited unless the server address is a private IP or domain
 
-Executed: Go race tests and go vet, 49 frontend tests, TypeScript/Vite production build, and three installer regression checks all passed.
+The same policy is present in the pinned upstream `infra/conf/xray.go`. Existing loopback-only integration fixtures did not expose the public-destination restriction. The user's profile displayed TCP / NONE, consistent with this incompatibility, but the actual private URI was neither requested nor tested.
 
-## Previous release (0.2.0) verification
+## Explicit compatibility mode
 
+The user explicitly approved an older official core for the existing unencrypted scheme. Modern v26.11.9 remains the default. Legacy v25.12.8 is a separately named payload, selected only by an explicit compatibility request. Missing legacy payload must fail, never fall back. Compatibility is restricted to VLESS without TLS/Reality; no TLS validation flags or upstream connectivity checks are weakened.
 
-## Windows VLESS system-proxy implementation
+The frontend requires an opt-in and warning/confirmation before sending the compatibility flag. Consent is session-only and reset by profile selection; an active risk warning is driven by actual connection metadata. Old-core risks and the absence of VLESS-layer encryption are stated; HTTPS retains its independent TLS.
 
-- Pinned official Xray v26.11.9 Linux/Windows archives downloaded; each archive SHA256 matched the official release digest. Original executable checksums recorded; Windows distribution includes MPL-2.0 license and source link.
-- Real Xray local client/server HTTP round trips executed on Linux for raw/TCP, WebSocket, gRPC, HTTP Upgrade and XHTTP: PASS. Startup-context cancellation preserves the running core, unexpected exit is detected, dead proxy checks fail and invalid TLS certificates are rejected. TLS/Reality configuration variants are accepted by the actual core configuration validator; external TLS/Reality server handshakes are not proven by these tests.
-- `go test -race ./...` and `go vet ./...`: PASS. Includes client/API connection lifecycle tests, worker GUI-EOF/core-exit recovery tests and system proxy snapshot/conflict/partial-write tests with injected platform backend.
-- Frontend: 40 tests: PASS; TypeScript and Vite production build: PASS. Includes connect/disconnect, status polling/error handling and retrying failed restoration.
-- Real browser + actual Go API profile/language/layout smoke tests: PASS. This Linux preview intentionally has connection capability disabled; browser/React connection tests use controlled test responses rather than claim real Windows settings changes.
-- Windows GUI application and helper code cross-compiled; native Windows WinINet ABI is compile-time checked. Linux Wails desktop build/configuration tests and native WebKit API/chrome smoke: PASS.
+## Executed evidence
 
-### Important unverified cases
+- Go API opt-in regression was observed failing before implementation, then passed. Normal Connect never calls the compatibility connector; explicit compatibility selection is represented in authoritative state.
+- Worker rejects TLS compatibility, propagates the explicit variant to engine selection, and reports missing legacy binaries without automatic fallback. Unit/race checks passed.
+- Offline production path selection test with the real official cores: modern failed public-plaintext startup as expected; explicit legacy became ready. No external target connection was made by that test.
+- Full existing real-core transport integration suite executed against legacy v25.12.8: raw TCP, WS, gRPC, HTTP Upgrade and XHTTP reached a controlled local HTTP server. Untrusted local TLS certificates remained rejected; core cancellation/exit lifecycle checks passed.
 
-**No real Windows system proxy, installation/uninstallation, external user VLESS server or successful external Reality handshake was exercised on this Linux host.** This release is experimental, not a verified production VPN.
+Final frontend, package and full-suite checks are recorded in the release notes after execution.
 
-System proxy changes only affect applications that honour WinINet/system proxy. It does not configure WinHTTP/RAS, TUN, DNS interception, a kill switch or OpenVPN connections. No traffic/latency/speed figures are fabricated.
+## Limits
 
-A separate worker restores previous per-user proxy flags/server/bypass/PAC on normal disconnect, GUI pipe EOF or core exit. The worker retains the core and retries when restoration fails; external changes are not blindly overwritten. Killing the worker itself or power loss can still leave Windows pointing to localhost. Recovery instructions are included in README. Profiles and generated core configuration remain in RAM/stdin pipes, not saved to disk or logs.
+No Windows execution was available on the build host; native WinINet enable/restore and the user's actual server connection still require testing on their machine. The user evidence above is from 0.2.1 and is not evidence that 0.2.2 connects. Builds are unsigned. System HTTP proxy is not a full-device VPN; applications may bypass it, there is no kill switch, Linux is management-only, OpenVPN connectivity is not implemented, and profiles are memory-only.
 
-## Historical verification (0.1.3)
-
-## Installer shortcut update
-
-- Both Start menu and Desktop shortcuts are mandatory, with application icons and current-user shell folders. Older submenu shortcuts are cleaned up on update; uninstall removes both current and legacy shortcut paths.
-- Three static NSIS regression checks passed: required shortcuts/error handling, per-user/uninstall policy, and version agreement.
-- Go race tests and go vet, 18 frontend tests and production frontend build re-executed: PASS.
-- Windows x64 and Linux desktop executables rebuilt; Linux desktop configuration tests: PASS.
-- Real Windows install/update/uninstall and actual shortcut appearance are not tested on this Linux host. Packaging and static checks do not replace a Windows installation test.
-
-## Previous verification (0.1.2)
-
-## Frameless window update: re-executed checks
-
-- `go test -race ./...` and `go vet ./...`: PASS.
-- Frontend: 18 tests, including native control wiring and translated labels: PASS; TypeScript and Vite build: PASS.
-- Browser native-layout check with stubbed window runtime: full-window shell at 640x640, 940x820 and 1440x1000; no outer padding or horizontal overflow; drag/no-drag styles; minimise/maximise/quit call wiring; modal Escape: PASS. This check does not exercise an OS window manager.
-- Language and complete application Playwright smoke tests against real Go API: PASS.
-- Linux Wails build and desktop configuration tests: PASS. Configuration requires Frameless=true and DisableResize=false.
-- Native WebKit + real Go API smoke: PASS; three titlebar controls, full-window shell and Wails drag/no-drag CSS confirmed alongside Russian locale and import/rename/refused-connect checks.
-- Exact production Linux executable separately started and captured under Xvfb: PASS; custom titlebar visible, no standard titlebar or internal outer backdrop.
-- Windows GUI x64 cross-build with desktop tag: PASS. Real Windows launch, OS drag/resize, minimise/maximise/restore behaviour still require user verification. Xvfb has no normal desktop window manager; no claim of end-to-end window-manager interaction testing is made.
-
-## Previous localization verification (0.1.1)
-
-## Localization update: re-executed checks
-
-- `go test -race ./...` and `go vet ./...`: PASS.
-- Frontend: 15 tests (9 language + 6 application): PASS; TypeScript and Vite production build: PASS.
-- Real Playwright browser + Go API: en-US, ru-RU, fi-FI fallback; manual language switching, persistence on reload and restoration of system language: PASS.
-- Full existing real browser import/profile/settings/diagnostics smoke: PASS.
-- Linux production binary rebuilt; desktop Go tests in Ubuntu 24.04 container: PASS.
-- Native WebKit smoke under Russian system locale, real assets and Go API: PASS; report confirms `systemLocale=ru`, `uiLanguage=ru`, import 201, rename 200, connect correctly refused 409.
-- Exact updated Linux distributable separately launched under Xvfb with Russian locale and captured.
-- Updated Windows x64 GUI executable cross-built with desktop tag and WebView2 error mode; PE32+ format verified. Not executed on Windows.
-- Native smoke runs use an isolated network-disabled container; its sandbox override is test-only.
-
-## Previous baseline checks (not all re-executed for this update)
-
-## Real executions performed
-
-- Go race tests: `go test -race ./internal/client ./cmd/preview` — PASS.
-- Go middleware tests: `go test .` — PASS.
-- `go vet ./internal/client ./cmd/preview` — PASS.
-- Desktop configuration/middleware tests inside Ubuntu 24.04 GTK/WebKit container: `go test -tags desktop,webkit2_41 .` — PASS.
-- Frontend: 6 Vitest tests — PASS; TypeScript typecheck and Vite production build — PASS.
-- Real standalone Go HTTP process: VLESS and inline OpenVPN import, select/rename/delete, redacted metadata, unsafe configuration rejection, missing CSRF and invalid Host/Origin rejection, and unavailable-engine response — PASS.
-- Playwright against the real built frontend and Go HTTP API, **without route mocks**: VLESS paste and OpenVPN file import, invalid import, rename/select/delete/cancel, import input clearing, non-secret settings persistence, diagnostics, reload, no page errors, narrow-width overflow assertion — PASS.
-- Native Wails/WebKitGTK integration on Linux: real local API fetches from native WebView, import 201, rename 200, connect refused 409, disconnected state, memory storage and actual React assets (`usingRealUI=true`) — PASS. Synthetic profiles only.
-- **Exact distributable Linux executable** was separately started under Xvfb, remained running and rendered its embedded React UI and actual empty Go service state. This is not merely a mockup or browser preview.
-- Windows executable: successful Wails cross-build and PE32+ GUI x86-64 format inspection. **Not run on a real Windows machine.**
-- `govulncheck -test ./internal/client/... ./cmd/preview/...`: no vulnerabilities found in that checked scope.
-- `npm audit --omit=dev`: 0 reported production dependency vulnerabilities.
-
-These checks are not a full security audit, a certificate validation test, or proof of a working VPN connection. No actual VPN connection exists in this increment.
-
-## Headless test isolation
-
-Builder image installed GTK/WebKit only inside Docker; no host GTK/WebKit packages or VPN server settings were changed. Native tests ran as the unprivileged host UID inside a container with `--network none`. WebKit sandbox disabling was restricted to that disposable headless test environment. It is not embedded in the executable or recommended for normal use. Host font files and passwd/group mappings were mounted read-only for X11/DBus test setup; test outputs alone were writable.
-
-The `native_smoke` build tag is **test-only** and excluded from both distributed binaries. Its synthetic profile and report endpoint are never included in the normal desktop entrypoint.
-
-## Remaining limits
-
-- Configurations and profiles only survive while the Go app process runs; there is no credential vault or file persistence.
-- OpenVPN importer intentionally supports only the documented self-contained safe subset, not arbitrary OpenVPN exports.
-- No OpenVPN/sing-box core, privileged helper, TUN, DNS/route management, kill switch, auth password prompt, update mechanism, signing or installer.
-- Linux binary targets the tested Ubuntu 24.04 + GTK3/WebKitGTK4.1 environment; no all-distro portability claim.
-- Windows binary is unsigned and requires Microsoft WebView2 Runtime.
-
-`release/SHA256SUMS.txt` records the produced binary and archive checksums. Release archives contain code/configuration previews only, never user VPN credentials. UI screenshots marked TEST DATA contain synthetic reserved-address fixtures; the exact production startup screenshot contains no profiles.
+An in-memory restoration helper cannot cover forced termination of both helper and GUI, power loss or reboot. If necessary, disable the owned manual loopback proxy in Windows network proxy settings or restore your original settings. Do not run competing proxy clients.

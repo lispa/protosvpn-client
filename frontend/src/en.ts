@@ -1,4 +1,11 @@
 export const english:Record<string,string>={
+"Совместимость со старым Xray (небезопасно)":"Legacy Xray compatibility (unsafe)",
+"Небезопасная совместимость":"Unsafe compatibility",
+"Активно небезопасное подключение":"Unsafe legacy connection active",
+"Продолжить":"Continue",
+"Используется старый официальный Xray v25.12.8. Старая версия может содержать уязвимости и не иметь новых исправлений безопасности. VLESS сам по себе не шифрует трафик; у этого профиля нет TLS/Reality между клиентом и сервером. HTTPS-сайты сохраняют собственное TLS-шифрование, но это не защищает весь трафик прокси. Рекомендуем современный профиль с TLS/Reality.":"This uses legacy official Xray v25.12.8. The old version may contain vulnerabilities and lack newer security fixes. VLESS itself does not encrypt traffic; this profile has no TLS/Reality between client and server. HTTPS sites retain their own TLS encryption, but this does not protect all proxy traffic. We recommend a modern profile with TLS/Reality.",
+"Старое ядро совместимости недоступно. Проверьте установку приложения или используйте современный профиль с TLS/Reality.":"The legacy compatibility engine is unavailable. Check the application installation or use a modern profile with TLS/Reality.",
+"Совместимость доступна только для VLESS без TLS/Reality (security=none). Для этого профиля используйте обычное подключение.":"Compatibility is available only for VLESS without TLS/Reality (security=none). Use a normal connection for this profile.",
 "[ENGINE_START_FAILED] Xray не запустился или локальный прокси не готов. Сбой до проверки сервера.":"[ENGINE_START_FAILED] Xray failed to start or its local proxy is not ready. Server connectivity has not been tested.",
 "[EGRESS_CHECK_FAILED] Xray запущен, но HTTPS-проверка через сервер не прошла. Прокси Windows ещё не включён.":"[EGRESS_CHECK_FAILED] Xray started, but the HTTPS check through the server failed. The Windows proxy has not been enabled.",
 "[HELPER_START_FAILED] Windows не удалось запустить процесс-помощник.":"[HELPER_START_FAILED] Windows could not start the helper process.",

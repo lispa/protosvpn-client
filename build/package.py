@@ -1,7 +1,7 @@
 import hashlib,os,tarfile,zipfile,json
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent.parent
-OUT=ROOT/'release';VERSION='0.2.1-preview'
+OUT=ROOT/'release';VERSION='0.2.2-preview'
 def main():
     OUT.mkdir(exist_ok=True)
     win=ROOT/'build/bin/ProtosVPN-windows-amd64.exe';linux=ROOT/'build/bin/ProtosVPN-linux-amd64'
@@ -16,6 +16,11 @@ def main():
         expected=next(x['binarySHA256'] for x in manifest if x['platform']=='windows-amd64')
         assert hashlib.sha256(core.read_bytes()).hexdigest()==expected,'Core binary checksum mismatch'
         z.write(core,'core/xray.exe');z.write(ROOT/'build/cores/XRAY-LICENSE.txt','core/XRAY-LICENSE.txt')
+        legacy=ROOT/'build/cores/windows-amd64/xray-legacy.exe'
+        legacy_expected=next(x['binarySHA256'] for x in manifest if x['platform']=='windows-amd64' and x.get('variant')=='legacy')
+        assert hashlib.sha256(legacy.read_bytes()).hexdigest()==legacy_expected,'Legacy core binary checksum mismatch'
+        z.write(legacy,'core/xray-legacy.exe')
+        z.write(ROOT/'build/cores/XRAY-LEGACY-LICENSE.txt','core/XRAY-LEGACY-LICENSE.txt')
         z.write(ROOT/'build/cores/manifest.json','core/manifest.json');z.write(ROOT/'THIRD-PARTY.md','THIRD-PARTY.md')
     lp=OUT/f'ProtosVPN-{VERSION}-ubuntu24-amd64.tar.gz'
     with tarfile.open(lp,'w:gz') as t:

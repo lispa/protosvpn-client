@@ -23,7 +23,8 @@ type message struct {
 	Code   string `json:"code,omitempty"`
 }
 type request struct {
-	URI string `json:"uri"`
+	URI           string `json:"uri"`
+	Compatibility bool   `json:"compatibility"`
 }
 type session struct {
 	cmd   *exec.Cmd
@@ -42,7 +43,13 @@ func New(executable string) *Controller {
 	return &Controller{executable: executable, status: "disconnected"}
 }
 func corePath(executable string) string {
+	return selectedCorePath(executable, false)
+}
+func selectedCorePath(executable string, compatibility bool) string {
 	name := "xray"
+	if compatibility {
+		name += "-legacy"
+	}
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
@@ -61,10 +68,29 @@ func (c *Controller) Status() (string, string) {
 	return c.status, c.code
 }
 func (c *Controller) Connect(ctx context.Context, uri string) error {
+	return c.connect(ctx, uri, false)
+}
+func (c *Controller) ConnectCompatibility(ctx context.Context, uri string) error {
+	return c.connect(ctx, uri, true)
+}
+func (c *Controller) connect(ctx context.Context, uri string, compatibility bool) error {
 	c.mu.Lock()
 	if c.session != nil {
 		c.mu.Unlock()
 		return &client.ConnectionError{Code: "BUSY"}
+	}
+	if compatibility {
+		code := ""
+		if !compatibilityAllowed(uri) {
+			code = "UNSUPPORTED_COMPATIBILITY"
+		} else if info, err := os.Stat(selectedCorePath(c.executable, true)); err != nil || info.IsDir() {
+			code = "COMPATIBILITY_UNAVAILABLE"
+		}
+		if code != "" {
+			c.status, c.code = "error", code
+			c.mu.Unlock()
+			return &client.ConnectionError{Code: code}
+		}
 	}
 	cmd := exec.Command(c.executable, WorkerFlag)
 	configureCommand(cmd)
@@ -95,7 +121,7 @@ func (c *Controller) Connect(ctx context.Context, uri string) error {
 	c.code = ""
 	c.mu.Unlock()
 	go c.monitor(s, output)
-	if json.NewEncoder(input).Encode(request{URI: uri}) != nil {
+	if json.NewEncoder(input).Encode(request{URI: uri, Compatibility: compatibility}) != nil {
 		input.Close()
 		return &client.ConnectionError{Code: "CONNECT_FAILED"}
 	}
@@ -118,7 +144,7 @@ func (c *Controller) Connect(ctx context.Context, uri string) error {
 }
 func safeCode(code string) string {
 	switch code {
-	case "PROXY_FAILED", "RESTORE_FAILED", "BUSY", "UNSUPPORTED_PROFILE", "ENGINE_START_FAILED", "EGRESS_CHECK_FAILED", "HELPER_START_FAILED", "HELPER_EXITED", "HELPER_TIMEOUT":
+	case "PROXY_FAILED", "RESTORE_FAILED", "BUSY", "UNSUPPORTED_PROFILE", "ENGINE_START_FAILED", "EGRESS_CHECK_FAILED", "HELPER_START_FAILED", "HELPER_EXITED", "HELPER_TIMEOUT", "COMPATIBILITY_UNAVAILABLE", "UNSUPPORTED_COMPATIBILITY":
 		return code
 	}
 	return "CONNECT_FAILED"

@@ -25,6 +25,10 @@ func NewWithConnector(c Connector) *Service { s := New(); s.connector = c; retur
 
 // Serialize mutations while starting/stopping a connection without blocking state reads.
 func (s *Service) Connect(ctx context.Context, id string) error {
+	return s.ConnectWithCompatibility(ctx, id, false)
+}
+
+func (s *Service) ConnectWithCompatibility(ctx context.Context, id string, compatibility bool) error {
 	if !s.connectMu.TryLock() {
 		return ErrBusy
 	}
@@ -48,14 +52,28 @@ func (s *Service) Connect(ctx context.Context, id string) error {
 	if found.profile.Protocol != "vless" {
 		return ErrUnsupportedProfile
 	}
+	connect := s.connector.Connect
+	if compatibility {
+		if found.profile.Security != "" && found.profile.Security != "none" {
+			return &ConnectionError{Code: "UNSUPPORTED_COMPATIBILITY"}
+		}
+		legacy, ok := s.connector.(interface {
+			ConnectCompatibility(context.Context, string) error
+		})
+		if !ok {
+			return &ConnectionError{Code: "COMPATIBILITY_UNAVAILABLE"}
+		}
+		connect = legacy.ConnectCompatibility
+	}
 	status, _ := s.connector.Status()
 	if status == "connected" || status == "connecting" || status == "disconnecting" {
 		return ErrBusy
 	}
 	s.mu.Lock()
 	s.activeID = id
+	s.activeCompatibility = compatibility
 	s.mu.Unlock()
-	return s.connector.Connect(ctx, found.secret)
+	return connect(ctx, found.secret)
 }
 func (s *Service) Disconnect() error {
 	if !s.connectMu.TryLock() {
@@ -69,6 +87,7 @@ func (s *Service) Disconnect() error {
 	if err == nil {
 		s.mu.Lock()
 		s.activeID = ""
+		s.activeCompatibility = false
 		s.mu.Unlock()
 	}
 	return err
@@ -91,6 +110,7 @@ func (s *Service) connectionState() Connection {
 	s.mu.RLock()
 	if c.Status != "disconnected" && (c.Status != "error" || c.ErrorCode == "RESTORE_FAILED") {
 		c.ProfileID = s.activeID
+		c.Compatibility = s.activeCompatibility
 	}
 	s.mu.RUnlock()
 	return c

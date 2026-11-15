@@ -34,7 +34,9 @@ func MaybeRun() bool {
 	if err != nil {
 		return true
 	}
-	runWorker(os.Stdin, os.Stdout, proxyengine.New(corePath(executable)), systemproxy.New(), checkEgress)
+	runWorkerWithFactory(os.Stdin, os.Stdout, func(compatibility bool) engine {
+		return proxyengine.New(selectedCorePath(executable, compatibility))
+	}, systemproxy.New(), checkEgress)
 	return true
 }
 func checkEgress(ctx context.Context, endpoint string) error {
@@ -57,6 +59,9 @@ func checkEgress(ctx context.Context, endpoint string) error {
 	return nil
 }
 func runWorker(input io.Reader, output io.Writer, e engine, p proxyManager, check func(context.Context, string) error) {
+	runWorkerWithFactory(input, output, func(bool) engine { return e }, p, check)
+}
+func runWorkerWithFactory(input io.Reader, output io.Writer, newEngine func(bool) engine, p proxyManager, check func(context.Context, string) error) {
 	enc := json.NewEncoder(output)
 	send := func(status, code string) { _ = enc.Encode(message{Status: status, Code: code}) }
 	reader := bufio.NewReader(io.LimitReader(input, (1<<20)+1))
@@ -70,6 +75,11 @@ func runWorker(input io.Reader, output io.Writer, e engine, p proxyManager, chec
 		send("error", "CONNECT_FAILED")
 		return
 	}
+	if request.Compatibility && !compatibilityAllowed(request.URI) {
+		send("error", "UNSUPPORTED_COMPATIBILITY")
+		return
+	}
+	e := newEngine(request.Compatibility)
 	lostParent := make(chan struct{})
 	go func() { _, _ = io.Copy(io.Discard, reader); close(lostParent) }()
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
@@ -126,6 +136,17 @@ func runWorker(input io.Reader, output io.Writer, e engine, p proxyManager, chec
 	} else {
 		send("stopped", "")
 	}
+}
+func compatibilityAllowed(uri string) bool {
+	u, err := url.Parse(uri)
+	if err != nil || u.Scheme != "vless" {
+		return false
+	}
+	q, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return false
+	}
+	return (q.Get("security") == "" || q.Get("security") == "none") && (q.Get("encryption") == "" || q.Get("encryption") == "none")
 }
 func restoreUntilReleased(p proxyManager, send func(string, string)) {
 	notified := false
