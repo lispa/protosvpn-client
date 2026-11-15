@@ -1,26 +1,25 @@
-# Windows installer — 0.1.3-preview
+# Windows installer — 0.2.0-preview
 
-Both Start menu and Desktop shortcuts are now required and recreated on installation/update, including silent installs. The Start menu entry is directly named ProtosVPN. Both shortcuts use the application executable icon. Known legacy submenu shortcuts are cleaned up; uninstallation removes both shortcuts. Static regression tests: `python3 build/test_installer.py -v`.
+Run `ProtosVPN-0.2.0-preview-windows-amd64-setup.exe` as a normal Windows user. Disconnect and close the previous client before installing/updating.
 
-Run `ProtosVPN-0.1.3-preview-windows-amd64-setup.exe` as your normal Windows user. Close an already running ProtosVPN before installation or updates.
-
-- NSIS Unicode wizard, English/Russian language selection.
-- Installs the existing verified 0.1.3-preview Windows x64 GUI executable. Application functionality is unchanged.
-- Per-user install, default `%LOCALAPPDATA%\Programs\ProtosVPN`; `RequestExecutionLevel user`, no administrative privileges requested.
-- Creates both Start menu and Desktop shortcuts automatically.
-- Registers the uninstaller under HKCU so removal is available from Windows Apps settings.
-- Checks per-machine and per-user Evergreen WebView2 registration before first launch. If missing, offers the official Microsoft download page, without downloading or executing third-party dependencies. Install Evergreen Runtime there, then launch from Start.
-- Uninstall deletes only named application files and shortcuts; no recursive directory deletion and no WebView preference wipe. A running/locked executable blocks removal instead of forcing process termination.
-- This unsigned preview may trigger SmartScreen. It still has no VPN engine; profiles remain in RAM.
+- Per-user NSIS Unicode installer; English and Russian wizard.
+- Default installation: `%LOCALAPPDATA%\Programs\ProtosVPN`, no elevation.
+- Both Start menu and Desktop shortcuts are mandatory and recreated on update.
+- Includes the official pinned Xray-core executable in `core/xray.exe`, its MPL-2.0 license, origin/checksum manifest and `THIRD-PARTY.md` source information.
+- VLESS runs as a **system proxy**, not a TUN/full-device VPN. OpenVPN connectivity is not implemented.
+- WebView2 is required; the installer offers Microsoft's official download page if missing.
+- The GUI starts a separate helper from the same executable; the helper owns the Xray process and WinINet proxy snapshot. GUI pipe EOF or core exit triggers restore. Settings are not changed on import or application startup.
+- Previous proxy flags, server, bypass list and PAC configuration are kept in memory. If another program changes them, restoration avoids overwriting the external change.
+- The helper retries failed restoration instead of immediately killing the local proxy. This is not a guarantee against killing the helper itself, power loss, or OS shutdown. If necessary, disable the manual localhost proxy in Windows Settings and restore your prior settings manually. Do not run competing proxy clients.
+- Uninstall is available in Windows Apps settings. Disconnect first; uninstall removes only named binaries/docs/shortcuts, not arbitrary user files or WebView preferences.
 
 ## Build
 
-`bash build/build-installer.sh` uses a Docker-contained NSIS compiler; no host packages are installed. Build the Windows desktop executable first.
+1. Build frontend assets and Windows desktop executable (README application version must match).
+2. `python3 build/fetch-xray.py` downloads pinned official cores and validates published SHA256 digests.
+3. `bash build/build-installer.sh` uses Docker-contained NSIS; no host packages installed.
+4. `python3 build/test_installer.py -v` checks shortcut/uninstall/version regressions.
 
-## Verification performed
+## Verification scope
 
-- NSIS 3.09 compilation: succeeded; installer and uninstaller generated with two language tables.
-- `7z t` against setup EXE: Everything is Ok.
-- Extracted application bytes matched `build/bin/ProtosVPN-windows-amd64.exe` exactly; README and verification file bytes also matched. Embedded `Uninstall.exe` found.
-- SHA256 saved next to installer.
-- Installation, registry writes, shortcuts, upgrade/uninstall, missing-WebView2 workflow and app launch have NOT been exercised on Windows. Compiler/package checks are not a substitute for those tests.
+The core is exercised by real local VLESS client/server integration tests on Linux, while WinINet restore policy is tested through an injected backend and Windows ABI is cross-compiled. The NSIS package is compiled, extracted and compared against the exact intended binaries. **Real Windows WinINet calls, installer/uninstaller/shortcuts and a user's external server still require testing on Windows.**

@@ -35,10 +35,13 @@ type entry struct {
 	secret  string
 }
 type Service struct {
-	mu       sync.RWMutex
-	entries  []entry
-	selected string
-	token    string
+	connectMu sync.Mutex
+	connector Connector
+	activeID  string
+	mu        sync.RWMutex
+	entries   []entry
+	selected  string
+	token     string
 }
 
 func randomID() string {

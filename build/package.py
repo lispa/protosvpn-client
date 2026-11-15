@@ -1,7 +1,7 @@
 import hashlib,os,tarfile,zipfile,json
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent.parent
-OUT=ROOT/'release';VERSION='0.1.3-preview'
+OUT=ROOT/'release';VERSION='0.2.0-preview'
 def main():
     OUT.mkdir(exist_ok=True)
     win=ROOT/'build/bin/ProtosVPN-windows-amd64.exe';linux=ROOT/'build/bin/ProtosVPN-linux-amd64'
@@ -11,6 +11,12 @@ def main():
     wp=OUT/f'ProtosVPN-{VERSION}-windows-amd64.zip'
     with zipfile.ZipFile(wp,'w',zipfile.ZIP_DEFLATED) as z:
         z.write(win,'ProtosVPN.exe');z.writestr('README.ru.md',readme);z.write(ROOT/'VERIFICATION.md','VERIFICATION.md')
+        core=ROOT/'build/cores/windows-amd64/xray.exe'
+        manifest=json.loads((ROOT/'build/cores/manifest.json').read_text())
+        expected=next(x['binarySHA256'] for x in manifest if x['platform']=='windows-amd64')
+        assert hashlib.sha256(core.read_bytes()).hexdigest()==expected,'Core binary checksum mismatch'
+        z.write(core,'core/xray.exe');z.write(ROOT/'build/cores/XRAY-LICENSE.txt','core/XRAY-LICENSE.txt')
+        z.write(ROOT/'build/cores/manifest.json','core/manifest.json');z.write(ROOT/'THIRD-PARTY.md','THIRD-PARTY.md')
     lp=OUT/f'ProtosVPN-{VERSION}-ubuntu24-amd64.tar.gz'
     with tarfile.open(lp,'w:gz') as t:
         t.add(linux,arcname='ProtosVPN');t.add(ROOT/'README.md',arcname='README.ru.md');t.add(ROOT/'VERIFICATION.md',arcname='VERIFICATION.md')
@@ -18,7 +24,7 @@ def main():
     with zipfile.ZipFile(sp,'w',zipfile.ZIP_DEFLATED) as z:
         for base,dirs,files in os.walk(ROOT):
             rel=Path(base).relative_to(ROOT)
-            dirs[:]=[d for d in dirs if d not in ['node_modules','.git','release','coverage'] and not (rel==Path('build') and d in ['bin','qa'])]
+            dirs[:]=[d for d in dirs if d not in ['node_modules','.git','release','coverage','__pycache__'] and not (rel==Path('build') and d in ['bin','qa','cores'])]
             for file in files:
                 p=Path(base)/file
                 if file.startswith('.env') or p.suffix in ['.syso','.log','.ovpn','.key','.pem','.crt','.pfx','.p12','.tmp']:continue

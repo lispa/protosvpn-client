@@ -1,4 +1,23 @@
-# Verification of development preview 0.1.3
+# Verification of development preview 0.2.0
+
+## Windows VLESS system-proxy implementation
+
+- Pinned official Xray v26.11.9 Linux/Windows archives downloaded; each archive SHA256 matched the official release digest. Original executable checksums recorded; Windows distribution includes MPL-2.0 license and source link.
+- Real Xray local client/server HTTP round trips executed on Linux for raw/TCP, WebSocket, gRPC, HTTP Upgrade and XHTTP: PASS. Startup-context cancellation preserves the running core, unexpected exit is detected, dead proxy checks fail and invalid TLS certificates are rejected. TLS/Reality configuration variants are accepted by the actual core configuration validator; external TLS/Reality server handshakes are not proven by these tests.
+- `go test -race ./...` and `go vet ./...`: PASS. Includes client/API connection lifecycle tests, worker GUI-EOF/core-exit recovery tests and system proxy snapshot/conflict/partial-write tests with injected platform backend.
+- Frontend: 40 tests: PASS; TypeScript and Vite production build: PASS. Includes connect/disconnect, status polling/error handling and retrying failed restoration.
+- Real browser + actual Go API profile/language/layout smoke tests: PASS. This Linux preview intentionally has connection capability disabled; browser/React connection tests use controlled test responses rather than claim real Windows settings changes.
+- Windows GUI application and helper code cross-compiled; native Windows WinINet ABI is compile-time checked. Linux Wails desktop build/configuration tests and native WebKit API/chrome smoke: PASS.
+
+### Important unverified cases
+
+**No real Windows system proxy, installation/uninstallation, external user VLESS server or successful external Reality handshake was exercised on this Linux host.** This release is experimental, not a verified production VPN.
+
+System proxy changes only affect applications that honour WinINet/system proxy. It does not configure WinHTTP/RAS, TUN, DNS interception, a kill switch or OpenVPN connections. No traffic/latency/speed figures are fabricated.
+
+A separate worker restores previous per-user proxy flags/server/bypass/PAC on normal disconnect, GUI pipe EOF or core exit. The worker retains the core and retries when restoration fails; external changes are not blindly overwritten. Killing the worker itself or power loss can still leave Windows pointing to localhost. Recovery instructions are included in README. Profiles and generated core configuration remain in RAM/stdin pipes, not saved to disk or logs.
+
+## Historical verification (0.1.3)
 
 ## Installer shortcut update
 

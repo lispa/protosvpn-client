@@ -27,7 +27,25 @@ func sendError(w http.ResponseWriter, status int, code, message string) {
 	}{apiError{code, message}})
 }
 func serviceError(w http.ResponseWriter, e error) {
-	if errors.Is(e, ErrNotFound) {
+	var connectionError *ConnectionError
+	if errors.Is(e, ErrEngineUnavailable) {
+		engineUnavailable(w)
+	} else if errors.Is(e, ErrBusy) {
+		sendError(w, 409, "BUSY", "A connection operation is already active.")
+	} else if errors.Is(e, ErrUnsupportedProfile) {
+		sendError(w, 400, "UNSUPPORTED_PROFILE", "This profile is not supported in system proxy mode.")
+	} else if errors.As(e, &connectionError) {
+		code := connectionError.Code
+		switch code {
+		case "UNSUPPORTED_PROFILE":
+			sendError(w, 400, code, "This VLESS configuration is not supported.")
+			return
+		case "CONNECT_FAILED", "PROXY_FAILED", "RESTORE_FAILED", "BUSY":
+		default:
+			code = "CONNECT_FAILED"
+		}
+		sendError(w, 502, code, "Proxy operation failed; check the connection status.")
+	} else if errors.Is(e, ErrNotFound) {
 		sendError(w, 404, "NOT_FOUND", "Profile not found.")
 	} else {
 		sendError(w, 400, "INVALID_INPUT", "Invalid or unsupported profile data.")
@@ -156,7 +174,11 @@ func NewHandler(s *Service) http.Handler {
 					serviceError(w, ErrNotFound)
 					return
 				}
-				engineUnavailable(w)
+				if err := s.Connect(r.Context(), input.ID); err != nil {
+					serviceError(w, err)
+					return
+				}
+				sendJSON(w, 200, map[string]bool{"ok": true})
 				return
 			}
 			if e := s.Select(input.ID); e != nil {
@@ -169,7 +191,11 @@ func NewHandler(s *Service) http.Handler {
 			if !decodeBody(w, r, &input, true) {
 				return
 			}
-			engineUnavailable(w)
+			if err := s.Disconnect(); err != nil {
+				serviceError(w, err)
+				return
+			}
+			sendJSON(w, 200, map[string]bool{"ok": true})
 		default:
 			if r.Method == "PATCH" {
 				var input struct {

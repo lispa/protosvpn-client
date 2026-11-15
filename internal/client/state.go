@@ -6,6 +6,8 @@ import (
 )
 
 type Connection struct {
+	Mode            string `json:"mode"`
+	ErrorCode       string `json:"errorCode,omitempty"`
 	Status          string `json:"status"`
 	ProfileID       string `json:"profileId"`
 	EngineAvailable bool   `json:"engineAvailable"`
@@ -29,13 +31,14 @@ type Diagnostics struct {
 }
 
 func (s *Service) State() State {
+	connection := s.connectionState()
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	profiles := make([]Profile, 0, len(s.entries))
 	for _, e := range s.entries {
 		profiles = append(profiles, cloneProfile(e.profile))
 	}
-	return State{SystemLocale: systemLocale(), Version: "0.1.3", Profiles: profiles, SelectedID: s.selected, StorageMode: "memory", CSRFToken: s.token, Connection: Connection{Status: "disconnected"}}
+	return State{SystemLocale: systemLocale(), Version: "0.2.0", Profiles: profiles, SelectedID: s.selected, StorageMode: "memory", CSRFToken: s.token, Connection: connection}
 }
 func (s *Service) Select(id string) error {
 	s.mu.Lock()
@@ -63,6 +66,12 @@ func (s *Service) Rename(id, name string) (Profile, error) {
 	return Profile{}, ErrNotFound
 }
 func (s *Service) Delete(id string) error {
+	s.connectMu.Lock()
+	defer s.connectMu.Unlock()
+	connection := s.connectionState()
+	if connection.ProfileID == id && connection.Status != "disconnected" {
+		return ErrBusy
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i, e := range s.entries {
@@ -82,7 +91,8 @@ func (s *Service) Delete(id string) error {
 	return ErrNotFound
 }
 func (s *Service) Diagnostics() Diagnostics {
+	available := s.connectionState().EngineAvailable
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return Diagnostics{Version: "0.1.3", OS: runtime.GOOS, Arch: runtime.GOARCH, StorageMode: "memory", ProfileCount: len(s.entries)}
+	return Diagnostics{Version: "0.2.0", OS: runtime.GOOS, Arch: runtime.GOARCH, StorageMode: "memory", EngineAvailable: available, ProfileCount: len(s.entries)}
 }
