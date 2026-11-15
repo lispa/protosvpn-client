@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"protosvpn.local/client/internal/client"
 	"protosvpn.local/client/internal/proxyengine"
 	"protosvpn.local/client/internal/systemproxy"
 )
@@ -81,6 +82,8 @@ func runWorkerWithFactory(input io.Reader, output io.Writer, newEngine func(bool
 	}
 	e := newEngine(request.Compatibility)
 	lostParent := make(chan struct{})
+	lifetimeCtx, lifetimeCancel := context.WithCancel(context.Background())
+	defer lifetimeCancel()
 	go func() { _, _ = io.Copy(io.Discard, reader); close(lostParent) }()
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
@@ -90,6 +93,7 @@ func runWorkerWithFactory(input io.Reader, output io.Writer, newEngine func(bool
 		select {
 		case <-lostParent:
 			cancel()
+			lifetimeCancel()
 		case <-startupDone:
 		}
 	}()
@@ -105,10 +109,12 @@ func runWorkerWithFactory(input io.Reader, output io.Writer, newEngine func(bool
 		return
 	}
 	defer e.Close()
+	checkStarted := time.Now()
 	if check(ctx, endpoint) != nil {
 		send("error", "EGRESS_CHECK_FAILED")
 		return
 	}
+	latency := time.Since(checkStarted).Milliseconds()
 	if ctx.Err() != nil {
 		send("error", "CONNECT_FAILED")
 		return
@@ -120,15 +126,41 @@ func runWorkerWithFactory(input io.Reader, output io.Writer, newEngine func(bool
 		return
 	}
 	// Always unwind settings on GUI EOF, core exit or an output-pipe failure.
-	if enc.Encode(message{Status: "connected"}) != nil {
+	baseMetrics := &client.ConnectionMetrics{StartedAt: time.Now().UTC().Format(time.RFC3339Nano), LatencyMs: &latency}
+	var sampler trafficSampler
+	readMetrics := func() *client.ConnectionMetrics {
+		if provider, ok := e.(interface {
+			Stats(context.Context) (proxyengine.Traffic, error)
+		}); ok {
+			statsCtx, statsCancel := context.WithTimeout(lifetimeCtx, time.Second)
+			traffic, statsErr := provider.Stats(statsCtx)
+			statsCancel()
+			if statsErr == nil {
+				return sampler.sample(baseMetrics, traffic.UploadBytes, traffic.DownloadBytes, time.Now())
+			}
+		}
+		return client.CloneConnectionMetrics(baseMetrics)
+	}
+	if enc.Encode(message{Status: "connected", Metrics: readMetrics()}) != nil {
 		restoreUntilReleased(p, send)
 		return
 	}
 	coreExited := false
-	select {
-	case <-lostParent:
-	case <-e.Done():
-		coreExited = true
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+connected:
+	for {
+		select {
+		case <-lostParent:
+			break connected
+		case <-e.Done():
+			coreExited = true
+			break connected
+		case <-ticker.C:
+			if enc.Encode(message{Status: "metrics", Metrics: readMetrics()}) != nil {
+				break connected
+			}
+		}
 	}
 	restoreUntilReleased(p, send)
 	if coreExited {

@@ -1,7 +1,10 @@
 export interface Profile { id:string; name:string; protocol:'vless'|'openvpn'; host:string; port:number; transport:string; security:string; requiresAuth:boolean; warnings:string[] }
-export interface State { systemLocale?:string; version:string; profiles:Profile[]; selectedId:string; storageMode:'memory'; csrfToken:string; connection:{status:'disconnected'|'connecting'|'connected'|'disconnecting'|'error'; profileId:string; engineAvailable:boolean; mode:'system-proxy'; errorCode?:string; compatibility?:boolean} }
-export interface Diagnostics {version:string;os:string;arch:string;storageMode:'memory';engineAvailable:boolean;profileCount:number}
+import type {ConnectionMetrics} from './DashboardMetrics';
+export interface State { systemLocale?:string; version:string; profiles:Profile[]; selectedId:string; storageMode:'memory'|'protected'; storageStatus?:'ready'|'empty'|'error'; storageErrorCode?:'STORE_LOAD_FAILED'|'STORE_SAVE_FAILED'; csrfToken:string; connection:{status:'disconnected'|'connecting'|'connected'|'disconnecting'|'error'; profileId:string; engineAvailable:boolean; mode:'system-proxy'; errorCode?:string; compatibility?:boolean; metrics?:ConnectionMetrics} }
+export interface Diagnostics {version:string;os:string;arch:string;storageMode:'memory'|'protected';engineAvailable:boolean;profileCount:number}
 export const apiErrorMessages = {
+  STORE_LOAD_FAILED: 'Не удалось загрузить сохранённые профили. Существующий файл не перезаписан. Перезапустите приложение или проверьте доступ к хранилищу.',
+  STORE_SAVE_FAILED: 'Не удалось сохранить профили. Изменение не сохранено. Проверьте доступ к хранилищу и повторите попытку.',
   COMPATIBILITY_UNAVAILABLE: 'Старое ядро совместимости недоступно. Проверьте установку приложения или используйте современный профиль с TLS/Reality.',
   UNSUPPORTED_COMPATIBILITY: 'Совместимость доступна только для VLESS без TLS/Reality (security=none). Для этого профиля используйте обычное подключение.',
   ENGINE_START_FAILED: '[ENGINE_START_FAILED] Xray не запустился или локальный прокси не готов. Сбой до проверки сервера.',

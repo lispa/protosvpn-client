@@ -1,4 +1,6 @@
 export const english:Record<string,string>={
+"Не удалось загрузить сохранённые профили. Существующий файл не перезаписан. Перезапустите приложение или проверьте доступ к хранилищу.":"Could not load saved profiles. The existing file has not been overwritten. Restart the application or check storage access.",
+"Не удалось сохранить профили. Изменение не сохранено. Проверьте доступ к хранилищу и повторите попытку.":"Could not save profiles. The change was not saved. Check storage access and try again.",
 "Совместимость со старым Xray (небезопасно)":"Legacy Xray compatibility (unsafe)",
 "Небезопасная совместимость":"Unsafe compatibility",
 "Активно небезопасное подключение":"Unsafe legacy connection active",

@@ -16,7 +16,7 @@ describe('safe API errors',()=>{
     vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({error:{code,message:'SECRET backend output'}}),{status:502})));
     await expect(request('/connect')).rejects.toMatchObject({code,message:apiErrorMessages[code]});
   });
-  it.each(['ENGINE_UNAVAILABLE','UNSUPPORTED_PROFILE','CONNECT_FAILED','PROXY_FAILED','RESTORE_FAILED','BUSY'] as const)('maps %s to allowlisted bilingual text',async code=>{
+  it.each(['STORE_LOAD_FAILED','STORE_SAVE_FAILED','ENGINE_UNAVAILABLE','UNSUPPORTED_PROFILE','CONNECT_FAILED','PROXY_FAILED','RESTORE_FAILED','BUSY'] as const)('maps %s to allowlisted bilingual text',async code=>{
     vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code,message:'SECRET backend output'}),{status:500})));
     const error=await request('/connect').catch((cause:unknown)=>cause);
     expect(error).toBeInstanceOf(ApiError);

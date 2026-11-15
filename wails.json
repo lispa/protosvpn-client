@@ -8,5 +8,5 @@
  "frontend:dev:watcher":"npm run dev",
  "frontend:dev:serverUrl":"auto",
  "author":{"name":"ProtosVPN"},
- "info":{"productName":"ProtosVPN","productVersion":"0.2.2","comments":"Windows VLESS system proxy preview; not a full-device VPN. Profiles in memory."}
+ "info":{"productName":"ProtosVPN","productVersion":"0.2.3","comments":"Windows VLESS system proxy preview; not a full-device VPN. Profiles saved in protected per-user storage."}
 }

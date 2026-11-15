@@ -1,0 +1,21 @@
+import {act, render, screen, within} from '@testing-library/react';
+import {afterEach, expect, it, vi} from 'vitest';
+import {DashboardMetrics} from './DashboardMetrics';
+afterEach(()=>vi.useRealTimers());
+const t=(text:string)=>text;
+it('uses authoritative start time, ticks locally and clears stale metrics on disconnect',async()=>{
+ vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-15T12:01:05Z'));
+ const metrics={startedAt:'2026-11-15T12:00:00Z',latencyMs:123,downloadBps:2048,uploadBps:0,downloadBytes:1048576,uploadBytes:512};
+ const view=render(<DashboardMetrics connected metrics={metrics} t={t}/>);
+ expect(screen.getByText('00:01:05')).toBeInTheDocument();
+ expect(screen.getByText('2 KiB/s')).toBeInTheDocument();
+ expect(screen.getByText('0 B/s')).toBeInTheDocument();
+ expect(screen.getByText('123 мс')).toBeInTheDocument();
+ expect(screen.getByText(/↓ 1 MiB · ↑ 512 B/)).toBeInTheDocument();
+ await act(async()=>{vi.advanceTimersByTime(1000);});expect(screen.getByText('00:01:06')).toBeInTheDocument();
+ view.rerender(<DashboardMetrics connected={false} metrics={metrics} t={t}/>);
+ expect(screen.queryByText('00:01:06')).not.toBeInTheDocument();
+ expect(screen.queryByText('2 KiB/s')).not.toBeInTheDocument();
+ expect(within(screen.getByLabelText('Время сеанса')).getByText('—')).toBeInTheDocument();
+ expect(vi.getTimerCount()).toBe(0);
+});

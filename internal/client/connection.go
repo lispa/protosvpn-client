@@ -113,5 +113,10 @@ func (s *Service) connectionState() Connection {
 		c.Compatibility = s.activeCompatibility
 	}
 	s.mu.RUnlock()
+	if c.ProfileID != "" {
+		if provider, ok := s.connector.(interface{ Metrics() *ConnectionMetrics }); ok {
+			c.Metrics = CloneConnectionMetrics(provider.Metrics())
+		}
+	}
 	return c
 }

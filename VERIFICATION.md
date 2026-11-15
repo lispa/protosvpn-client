@@ -1,32 +1,34 @@
-# Verification — ProtosVPN 0.2.2-preview
+# Verification — ProtosVPN 0.2.3-preview
 
-## Reproduced incompatibility
+## Profile persistence
 
-The user ran the bundled Windows Xray v26.11.9 successfully, validated minimal stdin JSON (`Configuration OK`), and started a loopback HTTP inbound. Their curl probe returned HTTP 400 with `Proxy-Connection: close`, matching our readiness test. This establishes the manual executable/stdin/inbound path, not the app-generated VLESS config or an external connection.
+The desktop service now uses per-user persistent storage rather than an in-memory-only profile list. Import, rename, delete and selection save before publishing their changes. The vault is outside the executable directory, so moving a portable build does not change the storage location.
 
-On this Linux host, the actual modern Xray rejected a synthetic VLESS `security=none` / `encryption=none` outbound to a non-private destination during configuration loading:
+- Windows: `%APPDATA%\ProtosVPN\profiles.vault`, protected by current-user DPAPI and a restricted directory ACL. No plaintext fallback.
+- Linux: the user configuration directory (`$XDG_CONFIG_HOME/ProtosVPN` or `~/.config/ProtosVPN`), AES-GCM with a local permission-protected key. This is not an OS keyring; copying both files exposes the key.
+- Load/save failures are shown explicitly. A failed load blocks mutations instead of overwriting an unreadable vault. Failed saves do not silently apply a mutation.
+- Existing memory-only versions have no saved profiles to migrate. Import once in this version. Compatibility consent and active connections are not persisted.
 
-> vless without TLS or other encryption is prohibited unless the server address is a private IP or domain
+## Measured dashboard
 
-The same policy is present in the pinned upstream `infra/conf/xray.go`. Existing loopback-only integration fixtures did not expose the public-destination restriction. The user's profile displayed TCP / NONE, consistent with this incompatibility, but the actual private URI was neither requested nor tested.
+Session time is based on the connection start timestamp. Upload/download totals and rates come from the actual Xray outbound counters, not total-device traffic. The HTTPS-check duration is the initial connectivity check, not ICMP ping or continuous availability monitoring. Unavailable measurements display a dash. The unused traffic graph is explicitly identified as unavailable.
 
-## Explicit compatibility mode
+Both official cores were exercised against a controlled local VLESS server with HTTPS upload/download; counters increased and reads did not reset them. Tests covered cancellation, bounded/sanitized stats output, worker message validation and rate calculations.
 
-The user explicitly approved an older official core for the existing unencrypted scheme. Modern v26.11.9 remains the default. Legacy v25.12.8 is a separately named payload, selected only by an explicit compatibility request. Missing legacy payload must fail, never fall back. Compatibility is restricted to VLESS without TLS/Reality; no TLS validation flags or upstream connectivity checks are weakened.
+## Executed checks
 
-The frontend requires an opt-in and warning/confirmation before sending the compatibility flag. Consent is session-only and reset by profile selection; an active risk warning is driven by actual connection metadata. Old-core risks and the absence of VLESS-layer encryption are stated; HTTPS retains its independent TLS.
+- `go test -race -count=1 ./...` and `go vet ./...` passed on the Linux build host.
+- Real-core transport tests passed for TCP/raw, WebSocket, gRPC, HTTP Upgrade and XHTTP, including a separate run using the legacy core.
+- Real Xray statistics integration passed for modern v26.11.9 and legacy v25.12.8.
+- 71 frontend tests passed; TypeScript checking and production frontend build passed.
+- Eight installer/packaging tests passed, including tampered legacy core rejection.
+- Windows amd64 Wails production cross-build passed. Ubuntu 24.04 production build and desktop-tag tests passed in the build container.
+- NSIS installer compilation passed. Artifact checksums and packaged payloads are checked during release preparation.
 
-## Executed evidence
+## Compatibility and limits
 
-- Go API opt-in regression was observed failing before implementation, then passed. Normal Connect never calls the compatibility connector; explicit compatibility selection is represented in authoritative state.
-- Worker rejects TLS compatibility, propagates the explicit variant to engine selection, and reports missing legacy binaries without automatic fallback. Unit/race checks passed.
-- Offline production path selection test with the real official cores: modern failed public-plaintext startup as expected; explicit legacy became ready. No external target connection was made by that test.
-- Full existing real-core transport integration suite executed against legacy v25.12.8: raw TCP, WS, gRPC, HTTP Upgrade and XHTTP reached a controlled local HTTP server. Untrusted local TLS certificates remained rejected; core cancellation/exit lifecycle checks passed.
+Modern official Xray v26.11.9 remains the default. Legacy v25.12.8 is selected only after explicit opt-in and confirmation for VLESS without TLS/Reality. There is no automatic fallback. Modern Xray rejects the tested public-destination plaintext VLESS configuration; the legacy core accepts it. Old cores may lack security fixes. VLESS without TLS/Reality provides no transport encryption; HTTPS websites retain their own TLS.
 
-Final frontend, package and full-suite checks are recorded in the release notes after execution.
+The user confirmed that 0.2.2 changed their browser's public IP when connected and restored it after Disconnect. That observation does not verify 0.2.3 profile persistence, DPAPI, metrics or installer behavior on Windows. Native Windows execution was not available on the build host; these still require checking on Windows. Builds are unsigned.
 
-## Limits
-
-No Windows execution was available on the build host; native WinINet enable/restore and the user's actual server connection still require testing on their machine. The user evidence above is from 0.2.1 and is not evidence that 0.2.2 connects. Builds are unsigned. System HTTP proxy is not a full-device VPN; applications may bypass it, there is no kill switch, Linux is management-only, OpenVPN connectivity is not implemented, and profiles are memory-only.
-
-An in-memory restoration helper cannot cover forced termination of both helper and GUI, power loss or reboot. If necessary, disable the owned manual loopback proxy in Windows network proxy settings or restore your original settings. Do not run competing proxy clients.
+System HTTP proxy is not a full-device VPN: applications may bypass it, there is no kill switch, Linux is management-only and OpenVPN connectivity is not implemented. The restoration helper cannot cover forced termination of both helper and GUI, power loss or reboot. If necessary, disable the owned manual loopback proxy in Windows network proxy settings or restore your original settings. Do not run competing proxy clients.

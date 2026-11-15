@@ -30,7 +30,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Unable to locate application.")
 		return
 	}
-	service := client.NewWithConnector(proxyruntime.New(executable))
+	service := newDesktopService(executable)
 	defer service.Close()
 	options := newDesktopOptions(assets, client.NewHandler(service))
 	options.OnBeforeClose = func(context.Context) bool { return service.Close() != nil }

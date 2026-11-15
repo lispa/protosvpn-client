@@ -4,7 +4,7 @@ Unicode true
 !include "x64.nsh"
 
 !define APP "ProtosVPN"
-!define VERSION "0.2.2"
+!define VERSION "0.2.3"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProtosVPN"
 !define WEBVIEW_KEY "Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
 Name "${APP} ${VERSION}-preview"

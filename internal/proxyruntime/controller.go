@@ -3,6 +3,7 @@
 package proxyruntime
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"io"
@@ -19,8 +20,9 @@ import (
 const WorkerFlag = "--protosvpn-proxy-worker"
 
 type message struct {
-	Status string `json:"status"`
-	Code   string `json:"code,omitempty"`
+	Status  string                    `json:"status"`
+	Code    string                    `json:"code,omitempty"`
+	Metrics *client.ConnectionMetrics `json:"metrics,omitempty"`
 }
 type request struct {
 	URI           string `json:"uri"`
@@ -37,6 +39,7 @@ type Controller struct {
 	executable   string
 	session      *session
 	status, code string
+	metrics      *client.ConnectionMetrics
 }
 
 func New(executable string) *Controller {
@@ -66,6 +69,11 @@ func (c *Controller) Status() (string, string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.status, c.code
+}
+func (c *Controller) Metrics() *client.ConnectionMetrics {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return client.CloneConnectionMetrics(c.metrics)
 }
 func (c *Controller) Connect(ctx context.Context, uri string) error {
 	return c.connect(ctx, uri, false)
@@ -117,6 +125,7 @@ func (c *Controller) connect(ctx context.Context, uri string, compatibility bool
 		return &client.ConnectionError{Code: "HELPER_START_FAILED"}
 	}
 	c.session = s
+	c.metrics = nil
 	c.status = "connecting"
 	c.code = ""
 	c.mu.Unlock()
@@ -150,12 +159,14 @@ func safeCode(code string) string {
 	return "CONNECT_FAILED"
 }
 func (c *Controller) monitor(s *session, output io.ReadCloser) {
-	decoder := json.NewDecoder(io.LimitReader(output, 65536))
+	// Bound each message, not the total lifetime stream: metrics are continuous.
+	scanner := bufio.NewScanner(output)
+	scanner.Buffer(make([]byte, 4096), 16<<10)
 	first := true
 	stopped := false
-	for {
+	for scanner.Scan() {
 		var msg message
-		if decoder.Decode(&msg) != nil {
+		if json.Unmarshal(scanner.Bytes(), &msg) != nil {
 			break
 		}
 		c.mu.Lock()
@@ -164,26 +175,35 @@ func (c *Controller) monitor(s *session, output io.ReadCloser) {
 			case "connected":
 				c.status = "connected"
 				c.code = ""
+				c.metrics = client.CloneConnectionMetrics(msg.Metrics)
+			case "metrics":
+				if c.status == "connected" {
+					c.metrics = client.CloneConnectionMetrics(msg.Metrics)
+				}
 			case "stopped":
 				c.status = "disconnected"
 				c.code = ""
 				stopped = true
+				c.metrics = nil
 			case "error":
 				c.status = "error"
 				c.code = safeCode(msg.Code)
 			}
 		}
 		c.mu.Unlock()
-		if first {
+		if first && (msg.Status == "connected" || msg.Status == "error") {
 			s.ready <- msg
 			first = false
 		}
 	}
-	_ = s.cmd.Wait()
+	// Unblock the worker and its parent-liveness watcher before waiting.
+	_ = output.Close()
 	_ = s.input.Close()
+	_ = s.cmd.Wait()
 	c.mu.Lock()
 	if c.session == s {
 		c.session = nil
+		c.metrics = nil
 		if !stopped && c.status != "error" {
 			c.status = "error"
 			c.code = "HELPER_EXITED"
@@ -199,6 +219,7 @@ func (c *Controller) Disconnect() error {
 	c.mu.Lock()
 	s := c.session
 	if s == nil {
+		c.metrics = nil
 		c.status = "disconnected"
 		c.code = ""
 		c.mu.Unlock()

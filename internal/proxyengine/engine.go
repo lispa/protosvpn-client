@@ -26,12 +26,14 @@ var (
 // Engine is a single-use process owner. The binary must be a trusted official Xray executable.
 // All errors are intentionally static: subprocess output, URIs, paths and credentials are never returned.
 type Engine struct {
-	mu           sync.Mutex
-	binary       string
-	used, closed bool
-	cmd          *exec.Cmd
-	done         chan struct{}
-	once         sync.Once
+	mu            sync.Mutex
+	binary        string
+	used, closed  bool
+	cmd           *exec.Cmd
+	statsEndpoint string
+	ready         bool
+	done          chan struct{}
+	once          sync.Once
 }
 
 func New(binary string) *Engine { return &Engine{binary: binary, done: make(chan struct{})} }
@@ -69,8 +71,16 @@ func (e *Engine) Start(ctx context.Context, uri string) (string, error) {
 		return "", ErrStartup
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
+	// Hold both reservations together so the two ephemeral ports cannot coincide.
+	statsListener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		_ = listener.Close()
+		return "", ErrStartup
+	}
+	statsPort := statsListener.Addr().(*net.TCPAddr).Port
+	_ = statsListener.Close()
 	_ = listener.Close()
-	config, err := makeConfig(uri, port)
+	config, err := makeConfigWithStats(uri, port, statsPort)
 	if err != nil {
 		return "", err
 	}
@@ -89,6 +99,7 @@ func (e *Engine) Start(ctx context.Context, uri string) (string, error) {
 		return "", ErrLaunch
 	}
 	e.cmd = cmd
+	e.statsEndpoint = net.JoinHostPort("127.0.0.1", strconv.Itoa(statsPort))
 	e.mu.Unlock()
 	go func() { _ = cmd.Wait(); e.finish() }()
 	endpoint := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
@@ -122,6 +133,9 @@ func (e *Engine) Start(ctx context.Context, uri string) (string, error) {
 				return "", ErrExited
 			default:
 			}
+			e.mu.Lock()
+			e.ready = !e.closed
+			e.mu.Unlock()
 			ok = true
 			return endpoint, nil
 		}

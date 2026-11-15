@@ -37,6 +37,17 @@ func validHost(s string) bool {
 	return true
 }
 func makeConfig(uri string, port int) ([]byte, error) {
+	return buildConfig(uri, port, 0)
+}
+
+func makeConfigWithStats(uri string, port, statsPort int) ([]byte, error) {
+	if statsPort < 1 || statsPort > 65535 || statsPort == port {
+		return nil, ErrInvalid
+	}
+	return buildConfig(uri, port, statsPort)
+}
+
+func buildConfig(uri string, port, statsPort int) ([]byte, error) {
 	bad := func() ([]byte, error) { return nil, ErrInvalid }
 	if len(uri) > 65536 || strings.IndexFunc(uri, unicode.IsControl) >= 0 {
 		return bad()
@@ -233,6 +244,12 @@ func makeConfig(uri string, port int) ([]byte, error) {
 		user["flow"] = flow
 	}
 	config := map[string]any{"log": map[string]any{"loglevel": "none", "access": "none", "error": "none"}, "inbounds": []any{map[string]any{"listen": "127.0.0.1", "port": port, "protocol": "http", "settings": map[string]any{}}}, "outbounds": []any{map[string]any{"protocol": "vless", "settings": map[string]any{"vnext": []any{map[string]any{"address": u.Hostname(), "port": remote, "users": []any{user}}}}, "streamSettings": stream}}}
+	if statsPort != 0 {
+		config["outbounds"].([]any)[0].(map[string]any)["tag"] = "proxy"
+		config["api"] = map[string]any{"tag": "stats-api", "listen": net.JoinHostPort("127.0.0.1", strconv.Itoa(statsPort)), "services": []string{"StatsService"}}
+		config["stats"] = map[string]any{}
+		config["policy"] = map[string]any{"system": map[string]any{"statsOutboundUplink": true, "statsOutboundDownlink": true}}
+	}
 	b, err := json.Marshal(config)
 	if err != nil {
 		return bad()

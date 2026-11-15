@@ -27,6 +27,14 @@ func sendError(w http.ResponseWriter, status int, code, message string) {
 	}{apiError{code, message}})
 }
 func serviceError(w http.ResponseWriter, e error) {
+	if errors.Is(e, ErrStoreLoad) {
+		sendError(w, 503, "STORE_LOAD_FAILED", "Protected profile storage could not be loaded; existing data was not changed.")
+		return
+	}
+	if errors.Is(e, ErrStoreSave) {
+		sendError(w, 503, "STORE_SAVE_FAILED", "Protected profile storage could not be saved; changes were not applied.")
+		return
+	}
 	var connectionError *ConnectionError
 	if errors.Is(e, ErrEngineUnavailable) {
 		engineUnavailable(w)
