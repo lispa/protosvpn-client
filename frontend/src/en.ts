@@ -1,4 +1,9 @@
 export const english:Record<string,string>={
+"[ENGINE_START_FAILED] Xray не запустился или локальный прокси не готов. Сбой до проверки сервера.":"[ENGINE_START_FAILED] Xray failed to start or its local proxy is not ready. Server connectivity has not been tested.",
+"[EGRESS_CHECK_FAILED] Xray запущен, но HTTPS-проверка через сервер не прошла. Прокси Windows ещё не включён.":"[EGRESS_CHECK_FAILED] Xray started, but the HTTPS check through the server failed. The Windows proxy has not been enabled.",
+"[HELPER_START_FAILED] Windows не удалось запустить процесс-помощник.":"[HELPER_START_FAILED] Windows could not start the helper process.",
+"[HELPER_EXITED] Процесс-помощник завершился без корректного ответа.":"[HELPER_EXITED] The helper process exited without a valid reply.",
+"[HELPER_TIMEOUT] Процесс-помощник не ответил за 30 секунд.":"[HELPER_TIMEOUT] The helper process did not reply within 30 seconds.",
 "Просмотр диагностики не изменяет настройки сети. Данные диагностики не отправляются во внешние сервисы.":"Viewing diagnostics does not change network settings. Diagnostic data is not sent to external services.",
 "Подключение…":"Connecting…","Отключение…":"Disconnecting…","Отключить":"Disconnect","Ошибка подключения":"Connection error","Системный прокси включён":"System proxy enabled","Прокси включён":"Proxy enabled",
 "Режим: системный прокси · не VPN-туннель":"Mode: system proxy · not a VPN tunnel",

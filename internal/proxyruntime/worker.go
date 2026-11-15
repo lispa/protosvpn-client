@@ -86,7 +86,7 @@ func runWorker(input io.Reader, output io.Writer, e engine, p proxyManager, chec
 	endpoint, err := e.Start(ctx, request.URI)
 	request.URI = ""
 	if err != nil {
-		code := "CONNECT_FAILED"
+		code := "ENGINE_START_FAILED"
 		if errors.Is(err, proxyengine.ErrInvalid) {
 			code = "UNSUPPORTED_PROFILE"
 		}
@@ -96,7 +96,7 @@ func runWorker(input io.Reader, output io.Writer, e engine, p proxyManager, chec
 	}
 	defer e.Close()
 	if check(ctx, endpoint) != nil {
-		send("error", "CONNECT_FAILED")
+		send("error", "EGRESS_CHECK_FAILED")
 		return
 	}
 	if ctx.Err() != nil {

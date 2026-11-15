@@ -1,6 +1,6 @@
-# Windows installer — 0.2.0-preview
+# Windows installer — 0.2.1-preview
 
-Run `ProtosVPN-0.2.0-preview-windows-amd64-setup.exe` as a normal Windows user. Disconnect and close the previous client before installing/updating.
+Run `ProtosVPN-0.2.1-preview-windows-amd64-setup.exe` as a normal Windows user. Disconnect and close the previous client before installing/updating.
 
 - Per-user NSIS Unicode installer; English and Russian wizard.
 - Default installation: `%LOCALAPPDATA%\Programs\ProtosVPN`, no elevation.

@@ -1,7 +1,7 @@
 import hashlib,os,tarfile,zipfile,json
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent.parent
-OUT=ROOT/'release';VERSION='0.2.0-preview'
+OUT=ROOT/'release';VERSION='0.2.1-preview'
 def main():
     OUT.mkdir(exist_ok=True)
     win=ROOT/'build/bin/ProtosVPN-windows-amd64.exe';linux=ROOT/'build/bin/ProtosVPN-linux-amd64'

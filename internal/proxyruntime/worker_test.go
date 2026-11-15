@@ -95,7 +95,7 @@ func TestWorkerDoesNotSetProxyWhenRemoteCheckFails(t *testing.T) {
 	}()
 	json.NewEncoder(w).Encode(request{URI: "synthetic"})
 	var msg message
-	if err := json.NewDecoder(output).Decode(&msg); err != nil || msg.Code != "CONNECT_FAILED" {
+	if err := json.NewDecoder(output).Decode(&msg); err != nil || msg.Code != "EGRESS_CHECK_FAILED" {
 		t.Fatal(msg, err)
 	}
 	w.Close()

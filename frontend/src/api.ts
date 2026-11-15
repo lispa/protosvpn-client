@@ -2,6 +2,11 @@ export interface Profile { id:string; name:string; protocol:'vless'|'openvpn'; h
 export interface State { systemLocale?:string; version:string; profiles:Profile[]; selectedId:string; storageMode:'memory'; csrfToken:string; connection:{status:'disconnected'|'connecting'|'connected'|'disconnecting'|'error'; profileId:string; engineAvailable:boolean; mode:'system-proxy'; errorCode?:string} }
 export interface Diagnostics {version:string;os:string;arch:string;storageMode:'memory';engineAvailable:boolean;profileCount:number}
 export const apiErrorMessages = {
+  ENGINE_START_FAILED: '[ENGINE_START_FAILED] Xray не запустился или локальный прокси не готов. Сбой до проверки сервера.',
+  EGRESS_CHECK_FAILED: '[EGRESS_CHECK_FAILED] Xray запущен, но HTTPS-проверка через сервер не прошла. Прокси Windows ещё не включён.',
+  HELPER_START_FAILED: '[HELPER_START_FAILED] Windows не удалось запустить процесс-помощник.',
+  HELPER_EXITED: '[HELPER_EXITED] Процесс-помощник завершился без корректного ответа.',
+  HELPER_TIMEOUT: '[HELPER_TIMEOUT] Процесс-помощник не ответил за 30 секунд.',
   ENGINE_UNAVAILABLE: 'VPN-ядро недоступно. Подключение невозможно.',
   UNSUPPORTED_PROFILE: 'Подключение доступно только для VLESS. OpenVPN пока недоступен.',
   CONNECT_FAILED: 'Не удалось подключиться. Проверьте профиль и повторите попытку.',
@@ -22,7 +27,16 @@ export async function request<T>(path:string, init:RequestInit = {}):Promise<T> 
   const response = await fetch(`/api${path}`, {cache:'no-store', ...init});
   if (!response.ok) {
     let code:unknown;
-    try {const body:unknown=await response.json();if(body && typeof body==='object')code=(body as {code?:unknown;errorCode?:unknown}).code ?? (body as {errorCode?:unknown}).errorCode;}catch { /* Never expose response text. */ }
+    try {
+      const body:unknown=await response.json();
+      if(body && typeof body==='object') {
+        const payload=body as {error?:unknown;code?:unknown;errorCode?:unknown};
+        const nested=payload.error;
+        code=nested && typeof nested==='object'
+          ? (nested as {code?:unknown}).code
+          : payload.code ?? payload.errorCode;
+      }
+    } catch { /* Never expose response text. */ }
     throw new ApiError(code);
   }
   return response.json() as Promise<T>;

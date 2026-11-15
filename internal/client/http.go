@@ -40,7 +40,7 @@ func serviceError(w http.ResponseWriter, e error) {
 		case "UNSUPPORTED_PROFILE":
 			sendError(w, 400, code, "This VLESS configuration is not supported.")
 			return
-		case "CONNECT_FAILED", "PROXY_FAILED", "RESTORE_FAILED", "BUSY":
+		case "CONNECT_FAILED", "PROXY_FAILED", "RESTORE_FAILED", "BUSY", "ENGINE_START_FAILED", "EGRESS_CHECK_FAILED", "HELPER_START_FAILED", "HELPER_EXITED", "HELPER_TIMEOUT":
 		default:
 			code = "CONNECT_FAILED"
 		}

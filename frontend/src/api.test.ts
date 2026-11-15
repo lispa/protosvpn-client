@@ -3,6 +3,19 @@ import {ApiError,apiErrorMessages,request} from './api';
 import {translate} from './i18n';
 afterEach(()=>vi.unstubAllGlobals());
 describe('safe API errors',()=>{
+  it.each(['ENGINE_START_FAILED','EGRESS_CHECK_FAILED','HELPER_START_FAILED','HELPER_EXITED','HELPER_TIMEOUT'])('shows safe diagnostic stage %s from actual API shape',async code=>{
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({error:{code,message:'SECRET upstream'}}),{status:502})));
+    const error=await request('/connect').catch((cause:unknown)=>cause);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({code});
+    expect((error as ApiError).message).toContain(`[${code}]`);
+    expect(translate('en',(error as ApiError).message)).not.toBe((error as ApiError).message);
+    expect((error as ApiError).message).not.toContain('SECRET');
+  });
+  it.each(['CONNECT_FAILED','PROXY_FAILED','RESTORE_FAILED','UNSUPPORTED_PROFILE'] as const)('reads actual Go API nested error %s without exposing message',async code=>{
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({error:{code,message:'SECRET backend output'}}),{status:502})));
+    await expect(request('/connect')).rejects.toMatchObject({code,message:apiErrorMessages[code]});
+  });
   it.each(['ENGINE_UNAVAILABLE','UNSUPPORTED_PROFILE','CONNECT_FAILED','PROXY_FAILED','RESTORE_FAILED','BUSY'] as const)('maps %s to allowlisted bilingual text',async code=>{
     vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code,message:'SECRET backend output'}),{status:500})));
     const error=await request('/connect').catch((cause:unknown)=>cause);

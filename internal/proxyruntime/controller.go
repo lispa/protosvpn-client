@@ -70,22 +70,25 @@ func (c *Controller) Connect(ctx context.Context, uri string) error {
 	configureCommand(cmd)
 	input, err := cmd.StdinPipe()
 	if err != nil {
+		c.status, c.code = "error", "HELPER_START_FAILED"
 		c.mu.Unlock()
-		return &client.ConnectionError{Code: "CONNECT_FAILED"}
+		return &client.ConnectionError{Code: "HELPER_START_FAILED"}
 	}
 	output, err := cmd.StdoutPipe()
 	if err != nil {
 		input.Close()
+		c.status, c.code = "error", "HELPER_START_FAILED"
 		c.mu.Unlock()
-		return &client.ConnectionError{Code: "CONNECT_FAILED"}
+		return &client.ConnectionError{Code: "HELPER_START_FAILED"}
 	}
 	cmd.Stderr = io.Discard
 	s := &session{cmd: cmd, input: input, done: make(chan struct{}), ready: make(chan message, 1)}
 	if err = cmd.Start(); err != nil {
 		input.Close()
 		output.Close()
+		c.status, c.code = "error", "HELPER_START_FAILED"
 		c.mu.Unlock()
-		return &client.ConnectionError{Code: "CONNECT_FAILED"}
+		return &client.ConnectionError{Code: "HELPER_START_FAILED"}
 	}
 	c.session = s
 	c.status = "connecting"
@@ -110,12 +113,12 @@ func (c *Controller) Connect(ctx context.Context, uri string) error {
 		return &client.ConnectionError{Code: "CONNECT_FAILED"}
 	case <-timer.C:
 		input.Close()
-		return &client.ConnectionError{Code: "CONNECT_FAILED"}
+		return &client.ConnectionError{Code: "HELPER_TIMEOUT"}
 	}
 }
 func safeCode(code string) string {
 	switch code {
-	case "PROXY_FAILED", "RESTORE_FAILED", "BUSY", "UNSUPPORTED_PROFILE":
+	case "PROXY_FAILED", "RESTORE_FAILED", "BUSY", "UNSUPPORTED_PROFILE", "ENGINE_START_FAILED", "EGRESS_CHECK_FAILED", "HELPER_START_FAILED", "HELPER_EXITED", "HELPER_TIMEOUT":
 		return code
 	}
 	return "CONNECT_FAILED"
@@ -157,12 +160,12 @@ func (c *Controller) monitor(s *session, output io.ReadCloser) {
 		c.session = nil
 		if !stopped && c.status != "error" {
 			c.status = "error"
-			c.code = "CONNECT_FAILED"
+			c.code = "HELPER_EXITED"
 		}
 	}
 	c.mu.Unlock()
 	if first {
-		s.ready <- message{Status: "error", Code: "CONNECT_FAILED"}
+		s.ready <- message{Status: "error", Code: "HELPER_EXITED"}
 	}
 	close(s.done)
 }

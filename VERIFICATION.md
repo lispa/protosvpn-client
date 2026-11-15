@@ -1,4 +1,17 @@
-# Verification of development preview 0.2.0
+# Verification of development preview 0.2.1
+
+## Diagnostic build — connection failure remains under investigation
+
+The user reports the same VLESS link works in XraySurf while ProtosVPN fails, with XraySurf fully closed during ProtosVPN testing. There is no current reproduction of that specific Windows failure on this Linux host.
+
+Confirmed defect: the frontend read flat `code`/`errorCode`, but the real Go API returns `error.code`. Regression tests failed with `REQUEST_FAILED` instead of the actual codes; the minimal parser fix passed. New stage codes distinguish helper startup/exit/timeout, core startup and HTTPS egress-check failures from WinINet proxy failures. Unknown messages and raw backend text remain hidden.
+
+The gstatic HTTPS check, timeouts, core configuration and system proxy policy are unchanged. This release is **not a claimed fix for the actual connection failure**. A Windows test/screenshot of the new diagnostic message is required to identify the failing boundary. No Windows environment or user credentials were available for direct reproduction.
+
+Executed: Go race tests and go vet, 49 frontend tests, TypeScript/Vite production build, and three installer regression checks all passed.
+
+## Previous release (0.2.0) verification
+
 
 ## Windows VLESS system-proxy implementation
 
